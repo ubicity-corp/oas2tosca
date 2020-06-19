@@ -17,19 +17,19 @@ from ruamel.yaml.reader import ReaderError
 from ruamel.yaml.error import MarkedYAMLError
 from ruamel.yaml.constructor import DuplicateKeyError
 
+# System support
+import sys
 
 class Swagger(object):
 
-    def __init__(self, swagger_file_name):
+    def __init__(self):
         """Constructor """
 
         # First, call superclass constructor
         super(Swagger, self).__init__()
 
-        self.file_name = swagger_file_name
-        
-        
-    def read(self):
+
+    def read(self, swagger_file_name):
         """Parse file content as YAML 
 
         Returns:
@@ -37,6 +37,7 @@ class Swagger(object):
         """
 
         # Open file
+        self.file_name = swagger_file_name
         try:
             swagger_file = open(self.file_name)
         except IOError as e:
@@ -121,8 +122,78 @@ class Swagger(object):
         return error
 
 
-    def convert(self, output_file_name):
+    def convert(self):
         # Convert definitions to TOSCA
+        self.tosca = dict()
+        self.unhandled = set()
+        
         definitions = self.data['definitions']
         for name, value in definitions.items():
-            logger.info("%s", name)
+            self.convert_definition(name, value)
+
+
+    def convert_definition(self, name, value):
+        data = dict()
+        try:
+            data['derived_from'] = value['type']
+        except KeyError:
+            pass
+        try:
+            data['description'] = value['description']
+        except KeyError:
+            pass
+        try:
+            data['description'] = value['description']
+        except KeyError:
+            pass
+        try:
+            meta = value['x-kubernetes-group-version-kind']
+            self.add_meta_data(data, 'x-kubernetes-group-version-kind', meta)
+        except KeyError:
+            pass
+        try:
+            meta = value['x-kubernetes-union']
+            self.add_meta_data(data, 'x-kubernetes-union', meta)
+        except KeyError:
+            pass
+        try:
+            meta = value['format']
+            self.add_meta_data(data, 'format', meta)
+        except KeyError:
+            pass
+
+        self.tosca[name] = data
+        for key in value.keys():
+            self.unhandled.add(key)
+
+
+    def add_meta_data(self, data, key, meta):
+        try:
+            metadata = data['metadata']
+        except KeyError:
+            data['metadata'] = dict()
+            metadata = data['metadata']
+        metadata[key] = meta
+
+        
+    def write(self, output_file_name):
+        # Open file if file name given
+        if output_file_name:
+            try:
+                out = open(output_file_name, "w+")
+            except IOError as e:
+                logger.error("Unable to open file '%s", output_file_name)
+                return
+        else:
+            out = sys.stdout
+            
+        # Dump YAML
+        yaml = YAML()
+        try:
+            yaml.dump(self.tosca, out)
+        except Exception as e:
+            logger.error("Unable to write: '%s", str(e))
+            return
+
+        logger.info("Unhandled: %s", str(self.unhandled))
+            

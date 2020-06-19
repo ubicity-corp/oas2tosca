@@ -57,15 +57,18 @@ if args.output:
     logger.debug("TOSCA output file: %s", args.output)
 
 # Create swagger processor
-swagger = swagger.Swagger(args.input)
+swagger = swagger.Swagger()
 
 # Read swagger input
-errors = swagger.read()
+errors = swagger.read(args.input)
 if errors:
     logger.error("Error reading <%s>:\n%s",
                  swagger.file_name,
                  json.dumps(errors, ensure_ascii=False, indent=2))
 
 # Convert to TOSCA    
-swagger.convert(args.output)    
+swagger.convert()
+
+# Write
+swagger.write(args.output)
 
