@@ -135,7 +135,7 @@ class Swagger(object):
     def convert_definition(self, name, value):
         data = dict()
         try:
-            data['derived_from'] = value['type']
+            data['derived_from'] = self.get_type(value['type'])
         except KeyError:
             pass
         try:
@@ -194,23 +194,82 @@ class Swagger(object):
         data = dict()
         properties[property_name] = data
         try:
-            data['type'] = value['type']
+            data['type'] = self.get_type(value['type'])
         except KeyError:
             pass
         try:
-            data['type'] = value['$ref']
+            data['entry_schema'] = self.get_entry_schema(value['items'])
+        except KeyError:
+            pass
+        try:
+            data['type'] = self.get_ref(value['$ref'])
         except KeyError:
             pass
         try:
             data['description'] = value['description']
         except KeyError:
             pass
+        # Everything else is metadata
+        for field in ['x-kubernetes-list-map-keys', 'format', 'x-kubernetes-list-type', 'x-kubernetes-patch-strategy', 'x-kubernetes-patch-merge-key']:
+            try:
+                meta = value[field]
+                self.add_meta_data(data, field, meta)
+            except KeyError:
+                pass
+
         for key in value.keys():
-            if not key in ['type', 'description', '$ref' ]:
+            if not key in ['type', 'description', '$ref', 'items', 'x-kubernetes-list-map-keys', 'format', 'x-kubernetes-list-type', 'x-kubernetes-patch-strategy', 'x-kubernetes-patch-merge-key']: 
                 self.unhandled.add(key)
 
 
+    def get_type(self, type):
+        if type == 'array':
+            return 'list'
+        elif type == 'object':
+            return 'tosca.datatypes.Root'
+        elif type == 'number':
+            return 'float'
+        else:
+            return type
+
+
+    def get_ref(self, ref):
+        # Only support local references for now
+        try:
+            if ref[0] != '#':
+                logger.error("%s: not a local reference", ref)
+                return
+        except Exception as e:
+            logger.error("%s: not a ref (%s)", str(ref), str(e))
+            return
+        # Make sure we reference a definition
+        prefix = "#/definitions/"
+        if ref.startswith(prefix):
+            # Strip prefix
+            return ref[len(prefix):]
+        else:
+            logger.info("%s: not a ref to a definition", ref)
+            return ref
+
+        
+    def get_entry_schema(self, value):
+        try:
+            return self.get_type(value['type'])
+        except KeyError:
+            pass
+        try:
+            return self.get_ref(value['$ref'])
+        except KeyError:
+            pass
+        logger.info("%s: no entry schema found", str(value))
+        return "not found"
+
+
     def write(self, output_file_name):
+        tosca = dict()
+        tosca['tosca_definitions_version'] = 'tosca_simple_yaml_1_3'
+        tosca['data_types'] = self.tosca
+        
         # Open file if file name given
         if output_file_name:
             try:
@@ -224,7 +283,7 @@ class Swagger(object):
         # Dump YAML
         yaml = YAML()
         try:
-            yaml.dump(self.tosca, out)
+            yaml.dump(tosca, out)
         except Exception as e:
             logger.error("Unable to write: '%s", str(e))
             return
