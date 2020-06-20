@@ -162,10 +162,20 @@ class Swagger(object):
         except KeyError:
             pass
 
-        self.tosca[name] = data
-        for key in value.keys():
-            self.unhandled.add(key)
+        try:
+            properties = value['properties']
+            self.add_properties(data, properties)
+            try:
+                required = value['required']
+                for property_name in required:
+                    property = data['properties'][property_name]
+                    property['required'] = True
+            except KeyError:
+                pass
+        except KeyError:
+            pass
 
+        self.tosca[name] = data
 
     def add_meta_data(self, data, key, meta):
         try:
@@ -175,7 +185,31 @@ class Swagger(object):
             metadata = data['metadata']
         metadata[key] = meta
 
-        
+    def add_properties(self, data, properties):
+        data['properties'] = dict()
+        for property_name, property_value in properties.items():
+            self.add_property(data['properties'], property_name, property_value)
+            
+    def add_property(self, properties, property_name, value):
+        data = dict()
+        properties[property_name] = data
+        try:
+            data['type'] = value['type']
+        except KeyError:
+            pass
+        try:
+            data['type'] = value['$ref']
+        except KeyError:
+            pass
+        try:
+            data['description'] = value['description']
+        except KeyError:
+            pass
+        for key in value.keys():
+            if not key in ['type', 'description', '$ref' ]:
+                self.unhandled.add(key)
+
+
     def write(self, output_file_name):
         # Open file if file name given
         if output_file_name:
