@@ -2,7 +2,7 @@
 # Module for reading swagger JSON
 #
 __author__ = "Chris Lauwers"
-__copyright__ = "Copyright (c) 2020, Ubicity Corp."
+__copyright__ = "Copyright (c) 2020-2021, Ubicity Corp."
 __version__ = "0.0.1"
 __email__ = "lauwers@ubicity.com"
 __status__ = "Prototype"
