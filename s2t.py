@@ -2,7 +2,7 @@
 # Command-Line tool for converting swagger to TOSCA data types
 #
 __author__ = "Chris Lauwers"
-__copyright__ = "Copyright (c) 2020, Ubicity Corp."
+__copyright__ = "Copyright (c) 2020-2021, Ubicity Corp."
 __version__ = "0.0.1"
 __email__ = "lauwers@ubicity.com"
 __status__ = "Prototype"
@@ -14,14 +14,10 @@ logger = logging.getLogger(__name__)
 # Parse command line arguments
 import argparse
 
-# File system manipulation functions
-import os
-
-# JSON support
-import json
-
 # Support for swagger files
-import swagger
+from read import read_swagger
+import swagger2
+import swagger3
 
 #
 # Create top-level command line argument parser
@@ -56,19 +52,35 @@ else:
 if args.output:
     logger.debug("TOSCA output file: %s", args.output)
 
-# Create swagger processor
-swagger = swagger.Swagger()
-
 # Read swagger input
-errors = swagger.read(args.input)
-if errors:
-    logger.error("Error reading <%s>:\n%s",
-                 swagger.file_name,
-                 json.dumps(errors, ensure_ascii=False, indent=2))
+try:
+    swagger_data = read_swagger(args.input)
+except Exception as e:
+    logger.error("Error reading '%s': %s", args.input, str(e))
+    exit(1)
 
-# Convert to TOSCA    
-swagger.convert()
+# Invoke the appropriate converter
+try:
+    swagger_version = swagger_data['swagger']
+    if swagger_version == '2.0':
+        logger.info("Converting Swagger 2.0 file")
+        swagger = swagger2.Swagger2(swagger_data)
+    elif swagger_version == '3.0':
+        logger.info("Converting Swagger 3.0 file")
+        swagger = swagger3.Swagger3(swagger_data)
+    else:
+        logger.error("Unsupported Swagger version %s", swagger_version)
+        exit(2)
+except KeyError:
+    logger.error("Swagger version not specified")
+    exit(3)
 
-# Write
+# Convert
+try:
+    swagger.convert()
+except Exception as e:
+    logger.error("Error converting '%s': %s", args.input, str(e))
+    exit(4)
+
+# Write    
 swagger.write(args.output)
-
