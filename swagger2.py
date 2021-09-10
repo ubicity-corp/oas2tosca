@@ -14,35 +14,189 @@ logger = logging.getLogger(__name__)
 # System support
 import swagger
 
+# Text formatting
+import textwrap
+
 class Swagger2(swagger.Swagger):
 
-    def convert(self):
-        """ The k8s swagger file has the following sections:
-          - definitions
-          - info
-          - paths
-          - security
-          - securityDefinitions
-          - swagger
+    def convert(self, output_file_name):
+        """Convert a Swagger file to TOSCA type definitions and write to the
+        file specified by 'output_file_name'.
+
         """
+        # Open the file
+        self.open(output_file_name)
         
-        # Print which keys we have
-        for key in self.data.keys():
-            print(key)
+        self.process_info()            
+        self.process_host()
+        self.process_basePath()
+        self.process_schemes()
+        self.process_consumes()
+        self.process_produces()
+        self.process_paths()
+        self.process_definitions()
+        self.process_parameters()
+        self.process_responses()
+        self.process_securityDefinitions()
+        self.process_security()
+        self.process_tags()
+        self.process_externalDocs()
+
+        
+    def process_info(self):
+        """Process the (required) Info Object. This object provides metadata
+        about the API. The metadata can be used by the clients if
+        needed.
+        """
+        try:
+            info = self.data['info']
+        except KeyError:
+            logger.error("No Info")
+            return
+
+        indent = ""
+        self.emit_metadata(indent, info)
+
+    def emit_metadata(self, indent, data):
+        self.out.write(
+            "%smetadata:\n"
+            % indent
+        )
+        indent = indent + '  '
+        self.emit_key_value_data(indent, data)
+
+    def emit_key_value_data(self, indent, data):
+        for key, value in data.items():
+            if isinstance(value, str):
+                self.out.write("%s%s: %s\n" %
+                               (indent, key, value))
+            else:
+                self.out.write("%s%s:\n" %
+                               (indent, key))
+                self.emit_key_value_data(indent+"  ", value)
             
-        definitions = self.data['definitions']
+
+    def process_host(self):
+        """Process the host (name or ip) serving the API. This MUST be the
+        host only and does not include the scheme nor sub-paths. It
+        MAY include a port. If the host is not included, the host
+        serving the documentation is to be used (including the
+        port). The host does not support path templating.
+        """
+        try:
+            host = self.data['host']
+        except KeyError:
+            logger.info("No Host")
+            return
+
+        logger.info("Processing Host")
+            
+
+    def process_basePath(self):
+        """Process the base path on which the API is served, which is relative
+        to the host. If it is not included, the API is served directly
+        under the host. The value MUST start with a leading slash
+        (/). The basePath does not support path templating.
+        """
+        try:
+            basePath = self.data['basePath']
+        except KeyError:
+            logger.info("No BasePath")
+            return
+
+        logger.info("Processing BasePath")
+
+    def process_schemes(self):
+        """Process the transfer protocol of the API. Values MUST be from the
+        list: "http", "https", "ws", "wss". If the schemes is not
+        included, the default scheme to be used is the one used to
+        access the Swagger definition itself.
+        """
+        try:
+            schemes = self.data['schemes']
+        except KeyError:
+            logger.info("No Schemes")
+            return
+
+        logger.info("Processing Schemes")
+
+    def process_consumes(self):
+        """Process the list of MIME types the APIs can consume. This is global
+        to all APIs but can be overridden on specific API calls. Value
+        MUST be as described under Mime Types.
+
+        """
+        try:
+            consumes = self.data['consumes']
+        except KeyError:
+            logger.info("No Consumes")
+            return
+
+        logger.info("Processing Consumes")
+
+    def process_produces(self):
+        """Process the list of MIME types the APIs can produce. This is global
+        to all APIs but can be overridden on specific API calls. Value
+        MUST be as described under Mime Types.
+
+        """
+        try:
+            produces = self.data['produces']
+        except KeyError:
+            logger.info("No Produces")
+            return
+
+        logger.info("Processing Produces")
+
+    def process_paths(self):
+        """Process the (required) Paths Object, which defines the available
+        paths and operations for the API.
+
+        """
+        try:
+            paths = self.data['paths']
+        except KeyError:
+            logger.error("No Paths Object")
+            return
+
+        logger.info("Processing Paths Object")
+            
+
+    def process_definitions(self):
+        """Process the Definitions Object which holds data types produced and
+        consumed by operations.
+
+        """
+        try:
+            definitions = self.data['definitions']
+        except KeyError:
+            logger.info("No Definitions")
+            return
+
+        logger.info("Processing Definitions")
+        self.tosca = dict()
         for name, value in definitions.items():
             self.convert_definition(name, value)
 
+        self.emit_data_types(self.tosca)
 
+    def emit_data_types(self, data):
+        self.out.write("data_types:\n")
+        indent = "  "
+        for name, definition in data.items():
+            self.emit_data_type(indent, name, definition)
+        
+    def emit_data_type(self, indent, name, definition):
+        self.out.write("%s%s:\n" % (indent, name))
+        indent = indent + '  '
+        self.out.write("%sderived_from: %s\n" % (indent, definition['derived_from']))
+        self.emit_description(indent, definition['description'])
+        
+        
     def convert_definition(self, name, value):
         data = dict()
         try:
             data['derived_from'] = self.get_type(value['type'])
-        except KeyError:
-            pass
-        try:
-            data['description'] = value['description']
         except KeyError:
             pass
         try:
@@ -166,5 +320,150 @@ class Swagger2(swagger.Swagger):
             pass
         logger.info("%s: no entry schema found", str(value))
         return "not found"
+
+
+    def process_parameters(self):
+        """Process the Parameters Definitions Object which holds parameters
+        that can be used across operations. This property does not
+        define global parameters for all operations.
+
+        """
+        try:
+            parameters = self.data['parameters']
+        except KeyError:
+            logger.info("No Parameters")
+            return
+
+        logger.info("Processing Parameters")
+
+    def process_responses(self):
+        """Process the Responses Definitions Object which hold responses that
+        can be used across operations. This property does not define
+        global responses for all operations.
+
+        """
+        try:
+            responses = self.data['responses']
+        except KeyError:
+            logger.info("No Responses")
+            return
+
+        logger.info("Processing Responses")
+
+    def process_securityDefinitions(self):
+        """Process the Security Definitions Object which holds Security scheme
+        definitions that can be used across the specification.
+
+        """
+        try:
+            securityDefinitions = self.data['securityDefinitions']
+        except KeyError:
+            logger.info("No SecurityDefinitions")
+            return
+
+        logger.info("Processing SecurityDefinitions")
+
+    def process_security(self):
+        """Process the Security Requirement Object. This object holds a
+        declaration of which security schemes are applied for the API
+        as a whole. The list of values describes alternative security
+        schemes that can be used (that is, there is a logical OR
+        between the security requirements). Individual operations can
+        override this definition.
+
+        """
+        try:
+            security = self.data['security']
+        except KeyError:
+            logger.info("No Security")
+            return
+
+        logger.info("Processing Security")
+
+    def process_tags(self):
+        """Process the Tag Object which holds a list of tags used by the
+        specification with additional metadata. The order of the tags
+        can be used to reflect on their order by the parsing
+        tools. Not all tags that are used by the Operation Object must
+        be declared. The tags that are not declared may be organized
+        randomly or based on the tools' logic. Each tag name in the
+        list MUST be unique.
+
+        """
+        try:
+            tags = self.data['tags']
+        except KeyError:
+            logger.info("No Tags")
+            return
+
+        logger.info("Processing Tags")
+
+    def process_externalDocs(self):
+        """Process the External Documentation Object which defines additional
+        external documentation.
+
+        """
+        try:
+            externalDocs = self.data['externalDocs']
+        except KeyError:
+            logger.info("No ExternalDocs")
+            return
+
+        logger.info("Processing ExternalDocs")
+
+    def emit_description(self, indent, description):
+
+        # Emit description key
+        self.out.write(
+            "%sdescription: "
+            % (indent)
+        )
+        # Emit text. Split into multiple lines if necessary
+        lines = wrap_text(description)
+        self.emit_text_string(indent, lines)
+
+
+    def emit_text_string(self, indent, lines):
+        """Write a text value. We use YAML folded style if the text consists
+        of multiple lines or if it includes a colon character (or some
+        other character that would violate YAML syntax)
+        """
+        if len(lines) > 1 or (':' in lines[0]) or ('\'' in lines[0]):
+            # Emit folding character
+            self.out.write(">-\n")
+            # Emit individual lines. Make sure the first line is indented
+            # correctly.
+            first = True
+            for line in lines:
+                if first:
+                    self.out.write(
+                        "%s%s\n"
+                        % (indent + '  ', line.lstrip())
+                    )
+                    first = False
+                else:
+                    self.out.write(
+                        "%s%s\n"
+                        % (indent + '  ', line.lstrip())
+                    )
+        else:
+            self.out.write("%s\n"
+                     % lines[0]
+            )
+
+
+def wrap_text(text_string):
+    """Split a text string into multiple lines to improve legibility
+    """
+    # First, check to see if the text was already formatted. We do
+    # this by trying to split the text string into mutliple lines
+    # based on newlines contained in the string.
+    lines = text_string.splitlines()
+    if len(lines) > 1:
+        # Already formatted
+        return lines
+
+    # Not already formatted. Wrap it ourselves.
+    return textwrap.wrap(text_string)
 
 

@@ -77,10 +77,7 @@ except KeyError:
 
 # Convert
 try:
-    swagger.convert()
+    swagger.convert(args.output)
 except Exception as e:
     logger.error("Error converting '%s': %s", args.input, str(e))
     exit(4)
-
-# Write    
-swagger.write(args.output)
