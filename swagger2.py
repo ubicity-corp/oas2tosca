@@ -167,42 +167,98 @@ class Swagger2(swagger.Swagger):
         consumed by operations.
 
         """
+        # Make sure this swagger file has definitions
         try:
             definitions = self.data['definitions']
         except KeyError:
+            definitions = None
+        if not definitions:
             logger.info("No Definitions")
             return
 
         logger.info("Processing Definitions")
-        self.tosca = dict()
-        for name, value in definitions.items():
-            self.convert_definition(name, value)
-
-        self.emit_data_types(self.tosca)
-
-    def emit_data_types(self, data):
         self.out.write("data_types:\n")
         indent = "  "
-        for name, definition in data.items():
-            self.emit_data_type(indent, name, definition)
-        
-    def emit_data_type(self, indent, name, definition):
+
+        self.tosca = dict()
+        for name, value in definitions.items():
+            self.process_schema_object(indent, name, value)
+            self.out.write("\n")
+
+
+    def process_schema_object(self, indent, name, value):
+        """A Schema Object in Swagger 2 has the following:
+
+          $ref - As a JSON Reference
+          format (See Data Type Formats for further details)
+          title
+          description (GFM syntax can be used for rich text representation)
+          default (Unlike JSON Schema, the value MUST conform to the defined type for the Schema Object)
+          multipleOf
+          maximum
+          exclusiveMaximum
+          minimum
+          exclusiveMinimum
+          maxLength
+          minLength
+          pattern
+          maxItems
+          minItems
+          uniqueItems
+          maxProperties
+          minProperties
+          required
+          enum
+          type
+          items
+          allOf
+          properties
+          additionalProperties
+
+          discriminator(string): Adds support for polymorphism. The
+            discriminator is the schema property name that is used to
+            differentiate between other schema that inherit this
+            schema. The property name used MUST be defined at this
+            schema and it MUST be in the required property list. When
+            used, the value MUST be the name of this schema or any
+            schema that inherits it.
+
+          readOnly(boolean): Relevant only for Schema "properties"
+            definitions. Declares the property as "read only". This
+            means that it MAY be sent as part of a response but MUST
+            NOT be sent as part of the request. Properties marked as
+            readOnly being true SHOULD NOT be in the required list of
+            the defined schema. Default value is false.
+
+          xml(XML Object): This MAY be used only on properties
+            schemas. It has no effect on root schemas. Adds Additional
+            metadata to describe the XML representation format of this
+            property.
+
+          externalDocs(External Documentation Object): Additional
+            external documentation for this schema.
+
+          example(Any): A free-form property to include an example of
+            an instance for this schema
+
+        """
+        data = dict()
+
         self.out.write("%s%s:\n" % (indent, name))
         indent = indent + '  '
-        self.out.write("%sderived_from: %s\n" % (indent, definition['derived_from']))
-        self.emit_description(indent, definition['description'])
-        
-        
-    def convert_definition(self, name, value):
-        data = dict()
+
         try:
-            data['derived_from'] = self.get_type(value['type'])
+            derived_from = self.get_type(value['type'])
+            self.out.write("%sderived_from: %s\n" % (indent, derived_from))
         except KeyError:
             pass
+        
         try:
-            data['description'] = value['description']
+            description = value['description']
+            self.emit_description(indent, description)
         except KeyError:
             pass
+
         try:
             meta = value['x-kubernetes-group-version-kind']
             self.add_meta_data(data, 'x-kubernetes-group-version-kind', meta)
