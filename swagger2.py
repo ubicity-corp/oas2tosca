@@ -153,14 +153,179 @@ class Swagger2(swagger.Swagger):
         paths and operations for the API.
 
         """
+        # Check if this swagger file has paths
         try:
             paths = self.data['paths']
         except KeyError:
+            paths = None
+        if not paths:
             logger.error("No Paths Object")
             return
 
         logger.info("Processing Paths Object")
+        indent = ""
+        for name, value in paths.items():
+            self.process_path_object(indent, name, value)
+
             
+    def process_path_object(self, indent, name, value):
+        """A Path Object in Swagger 2 has the following:
+
+        $ref(string): Allows for an external definition of this path
+          item. The referenced structure MUST be in the format of a
+          Path Item Object. If there are conflicts between the
+          referenced definition and this Path Item's definition, the
+          behavior is undefined.
+        get(Operation Object): A definition of a GET operation on this
+          path.
+        put(Operation Object): A definition of a PUT operation on this
+          path.
+        post(Operation Object): A definition of a POST operation on
+          this path.
+        delete(Operation Object): A definition of a DELETE operation
+          on this path.
+        options(Operation Object): A definition of a OPTIONS operation
+          on this path.
+        head(Operation Object): A definition of a HEAD operation on
+          this path.
+        patch(Operation Object): A definition of a PATCH operation on
+          this path.
+        parameters([Parameter Object | Reference Object]): A list of
+          parameters that are applicable for all the operations
+          described under this path. These parameters can be
+          overridden at the operation level, but cannot be removed
+          there. The list MUST NOT include duplicated parameters. A
+          unique parameter is defined by a combination of a name and
+          location. The list can use the Reference Object to link to
+          parameters that are defined at the Swagger Object's
+          parameters. There can be one "body" parameter at most.
+        """
+        # Can we create a resource on this path?
+        try:
+            post = value['post']
+        except KeyError:
+            post = None
+        if not post:
+            logger.debug("'%s' does not have POST", name)
+            return
+        
+        # Are there path-level parameters?
+        try:
+            parameters = value['parameters']
+        except KeyError:
+            parameters = list()
+        logger.info("'%s' parameters:", name)
+        for parameter in parameters:
+            self.process_parameter_object(indent, name, parameter)
+            
+        self.process_operation_object(indent, name, post)
+        
+            
+    def process_operation_object(self, indent, name, value):
+        """An Operation Object in Swagger 2 has the following:
+
+        tags([string]): A list of tags for API documentation
+          control. Tags can be used for logical grouping of operations
+          by resources or any other qualifier.
+
+        summary(string): A short summary of what the operation
+          does. For maximum readability in the swagger-ui, this field
+          SHOULD be less than 120 characters.
+
+        description(string): A verbose explanation of the operation
+          behavior. GFM syntax can be used for rich text
+          representation.
+
+        externalDocs(External Documentation Object): Additional
+          external documentation for this operation.
+
+        operationId(string): Unique string used to identify the
+          operation. The id MUST be unique among all operations
+          described in the API. Tools and libraries MAY use the
+          operationId to uniquely identify an operation, therefore, it
+          is recommended to follow common programming naming
+          conventions.
+
+        consumes([string]): A list of MIME types the operation can
+          consume. This overrides the consumes definition at the
+          Swagger Object. An empty value MAY be used to clear the
+          global definition. Value MUST be as described under Mime
+          Types.
+
+        produces([string]): A list of MIME types the operation can
+          produce. This overrides the produces definition at the
+          Swagger Object. An empty value MAY be used to clear the
+          global definition. Value MUST be as described under Mime
+          Types.
+
+        parameters([Parameter Object | Reference Object]): A list of
+          parameters that are applicable for this operation. If a
+          parameter is already defined at the Path Item, the new
+          definition will override it, but can never remove it. The
+          list MUST NOT include duplicated parameters. A unique
+          parameter is defined by a combination of a name and
+          location. The list can use the Reference Object to link to
+          parameters that are defined at the Swagger Object's
+          parameters. There can be one "body" parameter at most.
+
+        responses(Responses Object): Required. The list of possible
+          responses as they are returned from executing this
+          operation.
+
+        schemes([string]): The transfer protocol for the
+          operation. Values MUST be from the list: "http", "https",
+          "ws", "wss". The value overrides the Swagger Object schemes
+          definition.
+
+        deprecated(boolean): Declares this operation to be
+          deprecated. Usage of the declared operation should be
+          refrained. Default value is false.
+
+        security([Security Requirement Object]): A declaration of
+          which security schemes are applied for this operation. The
+          list of values describes alternative security schemes that
+          can be used (that is, there is a logical OR between the
+          security requirements). This definition overrides any
+          declared top-level security. To remove a top-level security
+          declaration, an empty array can be used
+
+        """
+        try:
+            parameters = value['parameters']
+        except KeyError:
+            parameters = list()
+        logger.info("'%s' POST parameters:", name)
+        for parameter in parameters:
+            self.process_parameter_object(indent, name, parameter)
+
+        
+    def process_parameter_object(self, indent, name, value):
+        """An Operation Object in Swagger 2 has the following:
+
+        name(string): Required. The name of the parameter. Parameter
+          names are case sensitive.
+          If in is "path", the name field MUST correspond to the
+          associated path segment from the path field in the Paths
+          Object. See Path Templating for further information.  For
+          all other cases, the name corresponds to the parameter name
+          used based on the in property.
+
+        in(string): Required. The location of the parameter. Possible
+          values are "query", "header", "path", "formData" or "body".
+
+        description(string): A brief description of the
+          parameter. This could contain examples of use. GFM syntax
+          can be used for rich text representation.
+
+        required(boolean): Determines whether this parameter is
+          mandatory. If the parameter is in "path", this property is
+          required and its value MUST be true. Otherwise, the property
+          MAY be included and its default value is false.
+
+        schema(Schema Object): Required if 'in' is 'body'. The schema
+          defining the type used for the body parameter.
+        """
+        logger.info("Parameter '%s' in '%s'", value['name'], value['in'])
 
     def process_definitions(self):
         """Process the Definitions Object which holds data types produced and
@@ -330,10 +495,6 @@ class Swagger2(swagger.Swagger):
             except KeyError:
                 pass
 
-        for key in value.keys():
-            if not key in ['type', 'description', '$ref', 'items', 'x-kubernetes-list-map-keys', 'format', 'x-kubernetes-list-type', 'x-kubernetes-patch-strategy', 'x-kubernetes-patch-merge-key']: 
-                self.unhandled.add(key)
-
 
     def get_type(self, type):
         if type == 'array':
@@ -449,6 +610,8 @@ class Swagger2(swagger.Swagger):
         try:
             tags = self.data['tags']
         except KeyError:
+            tags = None
+        if not tags:
             logger.info("No Tags")
             return
 
