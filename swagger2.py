@@ -149,9 +149,8 @@ class Swagger2(swagger.Swagger):
         logger.info("Processing Produces")
 
     def process_paths(self):
-        """Process the (required) Paths Object, which defines the available
-        paths and operations for the API.
-
+        """Process the (required) Paths Object, which defines a list of
+        available paths and associated operations for the API.
         """
         # Check if this swagger file has paths
         try:
@@ -214,7 +213,7 @@ class Swagger2(swagger.Swagger):
             parameters = value['parameters']
         except KeyError:
             parameters = list()
-        logger.info("'%s' parameters:", name)
+        logger.debug("'%s' parameters:", name)
         for parameter in parameters:
             self.process_parameter_object(indent, name, parameter)
             
@@ -294,7 +293,7 @@ class Swagger2(swagger.Swagger):
             parameters = value['parameters']
         except KeyError:
             parameters = list()
-        logger.info("'%s' POST parameters:", name)
+        logger.debug("'%s' POST parameters:", name)
         for parameter in parameters:
             self.process_parameter_object(indent, name, parameter)
 
@@ -325,7 +324,43 @@ class Swagger2(swagger.Swagger):
         schema(Schema Object): Required if 'in' is 'body'. The schema
           defining the type used for the body parameter.
         """
-        logger.info("Parameter '%s' in '%s'", value['name'], value['in'])
+
+        # We create a node type for any resource that has a POST
+        # operation with a 'body' parameter
+        if value['in'] == 'body':
+            schema = value['schema']
+        else:
+            return
+
+        # We have an operation that can create a resource. Create a
+        # node type based on the body schema.
+        self.process_schema_for_node_type(indent, name, schema)
+
+    def process_schema_for_node_type(self, indent, name, schema):
+        
+        # Check to see if this schema references another schema (in
+        # which case all other properties in this schema object must
+        # be ignored according to the JSONSchema spec)
+        try:
+            ref = schema['$ref']
+            schema_ref = self.get_ref(ref)
+            try:
+                schema = self.data['definitions'][schema_ref]
+            except KeyError:
+                logger.error("%s not found", schema_ref)
+                return
+        except KeyError:
+            # Not a schema reference
+            pass
+
+        try:
+            for group_version_kind in schema['x-kubernetes-group-version-kind']:
+                kind = group_version_kind['kind']
+                logger.info("%s: %s", name, kind)
+        except KeyError:
+            logger.info("%s: no version kind", name)
+            pass
+
 
     def process_definitions(self):
         """Process the Definitions Object which holds data types produced and
