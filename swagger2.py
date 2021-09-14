@@ -74,7 +74,7 @@ class Swagger2(swagger.Swagger):
                 self.out.write("%s%s:\n" %
                                (indent, key))
                 self.emit_key_value_data(indent+"  ", value)
-            
+
 
     def process_host(self):
         """Process the host (name or ip) serving the API. This MUST be the
@@ -90,7 +90,6 @@ class Swagger2(swagger.Swagger):
             return
 
         logger.info("Processing Host")
-            
 
     def process_basePath(self):
         """Process the base path on which the API is served, which is relative
@@ -336,6 +335,7 @@ class Swagger2(swagger.Swagger):
         # node type based on the body schema.
         self.process_schema_for_node_type(indent, name, schema)
 
+
     def process_schema_for_node_type(self, indent, name, schema):
         
         # Check to see if this schema references another schema (in
@@ -353,6 +353,8 @@ class Swagger2(swagger.Swagger):
             # Not a schema reference
             pass
 
+        # For k8s resources, get the name of the resource from the
+        # 'x-kubernetes-group-version-kind' attribute.
         try:
             for group_version_kind in schema['x-kubernetes-group-version-kind']:
                 kind = group_version_kind['kind']
@@ -389,59 +391,145 @@ class Swagger2(swagger.Swagger):
     def process_schema_object(self, indent, name, value):
         """A Schema Object in Swagger 2 has the following:
 
-          $ref - As a JSON Reference
-          format (See Data Type Formats for further details)
-          title
-          description (GFM syntax can be used for rich text representation)
-          default (Unlike JSON Schema, the value MUST conform to the defined type for the Schema Object)
-          multipleOf
-          maximum
-          exclusiveMaximum
-          minimum
-          exclusiveMinimum
-          maxLength
-          minLength
-          pattern
-          maxItems
-          minItems
-          uniqueItems
-          maxProperties
-          minProperties
-          required
-          enum
-          type
-          items
-          allOf
-          properties
-          additionalProperties
+        $ref(URI Reference): Resolved against the current URI base, it
+          identifies the URI of a schema to use.  All other properties
+          in a "$ref" object MUST be ignored.
 
-          discriminator(string): Adds support for polymorphism. The
-            discriminator is the schema property name that is used to
-            differentiate between other schema that inherit this
-            schema. The property name used MUST be defined at this
-            schema and it MUST be in the required property list. When
-            used, the value MUST be the name of this schema or any
-            schema that inherits it.
+        title(string): Title of this schema.
 
-          readOnly(boolean): Relevant only for Schema "properties"
-            definitions. Declares the property as "read only". This
-            means that it MAY be sent as part of a response but MUST
-            NOT be sent as part of the request. Properties marked as
-            readOnly being true SHOULD NOT be in the required list of
-            the defined schema. Default value is false.
+        description(string--GFM syntax can be used for rich text
+          representation): Provides explanation about the purpose of
+          the instance described by this schema.
 
-          xml(XML Object): This MAY be used only on properties
-            schemas. It has no effect on root schemas. Adds Additional
-            metadata to describe the XML representation format of this
-            property.
+        default('type'). Supplies a default JSON value associated with
+          this schema.  (Unlike with regular JSON Schema, the value
+          must conform to the defined type for the Schema Object)
 
-          externalDocs(External Documentation Object): Additional
-            external documentation for this schema.
+        Validation Keywords for All Types
+        ---------------------------------
+          type(string): values must be one of the six primitive types
+            ("null", "boolean", "object", "array", "number", or
+            "string"), or "integer" which matches any number with a
+            zero fractional part.
 
-          example(Any): A free-form property to include an example of
-            an instance for this schema
+          format(string): Allows schema authors to convey semantic
+            information for the values of the given 'type'
 
+          enum(array): An instance validates successfully against this
+            keyword if its value is equal to one of the elements in
+            this keyword's array value.
+
+        Validation Keywords for Numeric Instances (number and integer)
+        --------------------------------------------------------------
+
+          multipleOf(number > 0): A numeric instance is valid only if
+            division by this keyword's value results in an integer.
+
+          maximum(number): the instance must be less than or exactly
+            equal to "maximum".
+
+          exclusiveMaximum(number): the instance must have a value
+            strictly less than (not equal to) "exclusiveMaximum".
+
+          minimum (number): the instance must be greater than or
+            exactly equal to "maximum".
+
+          exclusiveMinimum(number): the instance must have a value
+            strictly greater than (not equal to) "exclusiveMinimum".
+
+        Validation Keywords for Strings
+        -------------------------------
+
+          maxLength(number >= 0): string length must be less than, or
+            equal to, the value of this keyword.
+
+          minLength(number >= 0): string length must be greater than,
+            or equal to, the value of this keyword.
+
+          pattern(string): the regular expression must match the
+            instance successfully.
+
+        Validation Keywords for Arrays
+        ------------------------------
+
+          maxItems(number >= 0): the array size must be less than, or
+            equal to, the value of this keyword.
+
+          minItems(number >= 0): the array size must be greater than,
+            or equal to, the value of this keyword.
+
+          uniqueItems(boolean): If true, the instance validates
+            successfully if all of its elements are unique.
+
+        Validation Keywords for Objects
+        ------------------------------
+
+          maxProperties(number >= 0): the number of object properties
+            is less than, or equal to, the value of this keyword.
+
+          minProperties(number >= 0): the number of object properties
+            is greater than, or equal to, the value of this keyword.
+
+          required(string[]): a property value must be defined for
+            every property listed in the array
+
+        Keywords for Applying Subschemas In Place
+        -----------------------------------------
+
+          allOf(schema[]): An instance validates successfully against
+            this keyword if it validates successfully against all
+            schemas defined by this keyword's value.
+
+        Keywords for Applying Subschemas to Child Instances
+        -------------------------------------------------
+
+          Keywords for Applying Subschemas to Arrays
+          ------------------------------------------
+
+            items(schema or schema[]): If "items" is a schema,
+              validation succeeds if all elements in the array
+              successfully validate against that schema.  If "items"
+              is an array of schemas, validation succeeds if each
+              element of the instance validates against the schema at
+              the same position, if any.
+
+          Keywords for Applying Subschemas to Objects
+          -------------------------------------------
+
+            properties(dict of schema): Each value of this object must
+              be a valid JSON Schema.
+
+            additionalProperties(schema): schema for child values of
+              instance names that do not appear in the annotation
+              results of "properties"
+
+        discriminator(string): Adds support for polymorphism. The
+          discriminator is the schema property name that is used to
+          differentiate between other schema that inherit this
+          schema. The property name used MUST be defined at this
+          schema and it MUST be in the required property list. When
+          used, the value MUST be the name of this schema or any
+          schema that inherits it.
+
+        readOnly(boolean): Relevant only for Schema "properties"
+          definitions. Declares the property as "read only". This
+          means that it MAY be sent as part of a response but MUST NOT
+          be sent as part of the request. Properties marked as
+          readOnly being true SHOULD NOT be in the required list of
+          the defined schema. Default value is false.
+
+        xml(XML Object): This MAY be used only on properties
+          schemas. It has no effect on root schemas. Adds Additional
+          metadata to describe the XML representation format of this
+          property.
+
+        externalDocs(External Documentation Object): Additional
+          external documentation for this schema.
+
+        example(any): A free-form property to include an example of an
+          instance for this schema
         """
+
         data = dict()
 
         self.out.write("%s%s:\n" % (indent, name))
