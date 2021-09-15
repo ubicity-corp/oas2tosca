@@ -20,11 +20,84 @@ import textwrap
 class Swagger2(swagger.Swagger):
 
     def convert(self, output_file_name):
-        """Convert a Swagger file to TOSCA type definitions and write to the
-        file specified by 'output_file_name'.
+        """Convert a Swagger v2 object to TOSCA type definitions and write to
+        the file specified by 'output_file_name'. A swagger 2 object
+        is has the following properties:
+
+        swagger(string): Required. Specifies the Swagger Specification
+          version being used. It can be used by the Swagger UI and
+          other clients to interpret the API listing. The value MUST
+          be "2.0".
+
+        info(Info Object): Required. Provides metadata about the
+          API. The metadata can be used by the clients if needed.
+
+        host(string): The host (name or ip) serving the API. This MUST
+          be the host only and does not include the scheme nor
+          sub-paths. It MAY include a port. If the host is not
+          included, the host serving the documentation is to be used
+          (including the port). The host does not support path
+          templating.
+
+        basePath(string): The base path on which the API is served,
+          which is relative to the host. If it is not included, the
+          API is served directly under the host. The value MUST start
+          with a leading slash (/). The basePath does not support path
+          templating.
+
+        schemes([string]): The transfer protocol of the API. Values
+          MUST be from the list: "http", "https", "ws", "wss". If the
+          schemes is not included, the default scheme to be used is
+          the one used to access the Swagger definition itself.
+
+        consumes([string]): A list of MIME types the APIs can
+          consume. This is global to all APIs but can be overridden on
+          specific API calls. Value MUST be as described under Mime
+          Types.
+
+        produces([string]): A list of MIME types the APIs can
+          produce. This is global to all APIs but can be overridden on
+          specific API calls. Value MUST be as described under Mime
+          Types.
+
+        paths(Paths Object): Required. The available paths and
+          operations for the API.
+
+        definitions(Definitions Object): An object to hold data types
+          produced and consumed by operations.
+
+        parameters(Parameters Definitions Object): An object to hold
+          parameters that can be used across operations. This property
+          does not define global parameters for all operations.
+
+        responses(Responses Definitions Object): An object to hold
+          responses that can be used across operations. This property
+          does not define global responses for all operations.
+
+        securityDefinitions(Security Definitions Object): Security
+          scheme definitions that can be used across the
+          specification.
+
+        security([Security Requirement Object]): A declaration of
+          which security schemes are applied for the API as a
+          whole. The list of values describes alternative security
+          schemes that can be used (that is, there is a logical OR
+          between the security requirements). Individual operations
+          can override this definition.
+
+        tags([Tag Object]): A list of tags used by the specification
+          with additional metadata. The order of the tags can be used
+          to reflect on their order by the parsing tools. Not all tags
+          that are used by the Operation Object must be declared. The
+          tags that are not declared may be organized randomly or
+          based on the tools' logic. Each tag name in the list MUST be
+          unique.
+
+        externalDocs(External Documentation Object): Additional
+          external documentation.
 
         """
-        # Open the file
+        # Open the output file
         self.open(output_file_name)
         
         self.process_info()            
@@ -34,7 +107,7 @@ class Swagger2(swagger.Swagger):
         self.process_consumes()
         self.process_produces()
         self.process_paths()
-        self.process_definitions()
+        # self.process_definitions()
         self.process_parameters()
         self.process_responses()
         self.process_securityDefinitions()
@@ -46,7 +119,26 @@ class Swagger2(swagger.Swagger):
     def process_info(self):
         """Process the (required) Info Object. This object provides metadata
         about the API. The metadata can be used by the clients if
-        needed.
+        needed. A swagger 2 Info Object has the following properties:
+
+        title(string): Required. The title of the application.
+
+        description(string): A short description of the
+          application. GFM syntax can be used for rich text
+          representation.
+
+        termsOfService(string): The Terms of Service for the API.
+
+        contact(Contact Object): The contact information for the
+          exposed API.
+
+        license(License Object): The license information for the
+          exposed API.
+
+        version(string): Required Provides the version of the
+          application API (not to be confused with the specification
+          version)
+
         """
         try:
             info = self.data['info']
@@ -161,7 +253,8 @@ class Swagger2(swagger.Swagger):
             return
 
         logger.info("Processing Paths Object")
-        indent = ""
+        self.out.write("node_types:\n")
+        indent = "  "
         for name, value in paths.items():
             self.process_path_object(indent, name, value)
 
@@ -350,6 +443,7 @@ class Swagger2(swagger.Swagger):
                 logger.error("%s not found", schema_ref)
                 return
         except KeyError:
+            schema_ref = name
             # Not a schema reference
             pass
 
@@ -360,9 +454,12 @@ class Swagger2(swagger.Swagger):
                 kind = group_version_kind['kind']
                 logger.info("%s: %s", name, kind)
         except KeyError:
-            logger.info("%s: no version kind", name)
+            logger.debug("%s: no group version kind", name)
+            kind = schema_ref
             pass
 
+        self.process_schema_object(indent, kind, schema)
+    
 
     def process_definitions(self):
         """Process the Definitions Object which holds data types produced and
@@ -552,11 +649,13 @@ class Swagger2(swagger.Swagger):
             self.add_meta_data(data, 'x-kubernetes-group-version-kind', meta)
         except KeyError:
             pass
+
         try:
             meta = value['x-kubernetes-union']
             self.add_meta_data(data, 'x-kubernetes-union', meta)
         except KeyError:
             pass
+
         try:
             meta = value['format']
             self.add_meta_data(data, 'format', meta)
@@ -577,6 +676,7 @@ class Swagger2(swagger.Swagger):
             pass
 
         self.tosca[name] = data
+
 
     def add_meta_data(self, data, key, meta):
         try:
@@ -623,7 +723,7 @@ class Swagger2(swagger.Swagger):
         if type == 'array':
             return 'list'
         elif type == 'object':
-            return 'tosca.datatypes.Root'
+            return 'tosca.nodes.Root'
         elif type == 'number':
             return 'float'
         else:
