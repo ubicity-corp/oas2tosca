@@ -107,7 +107,7 @@ class Swagger2(swagger.Swagger):
         self.process_consumes()
         self.process_produces()
         self.process_paths()
-        # self.process_definitions()
+        self.process_definitions()
         self.process_parameters()
         self.process_responses()
         self.process_securityDefinitions()
@@ -143,12 +143,13 @@ class Swagger2(swagger.Swagger):
         try:
             info = self.data['info']
         except KeyError:
-            logger.error("No Info")
+            logger.error("No Info Object")
             return
 
         indent = ""
         self.emit_metadata(indent, info)
-
+        self.out.write("\n")
+        
     def emit_metadata(self, indent, data):
         self.out.write(
             "%smetadata:\n"
@@ -159,7 +160,7 @@ class Swagger2(swagger.Swagger):
 
     def emit_key_value_data(self, indent, data):
         for key, value in data.items():
-            if isinstance(value, str):
+            if isinstance(value, (str, list)):
                 self.out.write("%s%s: %s\n" %
                                (indent, key, value))
             else:
@@ -177,11 +178,11 @@ class Swagger2(swagger.Swagger):
         """
         try:
             host = self.data['host']
+            logger.debug("Processing Host")
         except KeyError:
-            logger.info("No Host")
+            logger.debug("No Host")
             return
 
-        logger.info("Processing Host")
 
     def process_basePath(self):
         """Process the base path on which the API is served, which is relative
@@ -191,11 +192,11 @@ class Swagger2(swagger.Swagger):
         """
         try:
             basePath = self.data['basePath']
+            logger.debug("Processing BasePath")
         except KeyError:
-            logger.info("No BasePath")
+            logger.debug("No BasePath")
             return
 
-        logger.info("Processing BasePath")
 
     def process_schemes(self):
         """Process the transfer protocol of the API. Values MUST be from the
@@ -205,11 +206,11 @@ class Swagger2(swagger.Swagger):
         """
         try:
             schemes = self.data['schemes']
+            logger.debug("Processing Schemes")
         except KeyError:
-            logger.info("No Schemes")
+            logger.debug("No Schemes")
             return
 
-        logger.info("Processing Schemes")
 
     def process_consumes(self):
         """Process the list of MIME types the APIs can consume. This is global
@@ -219,11 +220,11 @@ class Swagger2(swagger.Swagger):
         """
         try:
             consumes = self.data['consumes']
+            logger.debug("Processing Consumes")
         except KeyError:
-            logger.info("No Consumes")
+            logger.debug("No Consumes")
             return
 
-        logger.info("Processing Consumes")
 
     def process_produces(self):
         """Process the list of MIME types the APIs can produce. This is global
@@ -233,11 +234,11 @@ class Swagger2(swagger.Swagger):
         """
         try:
             produces = self.data['produces']
+            logger.debug("Processing Produces")
         except KeyError:
-            logger.info("No Produces")
+            logger.debug("No Produces")
             return
 
-        logger.info("Processing Produces")
 
     def process_paths(self):
         """Process the (required) Paths Object, which defines a list of
@@ -246,14 +247,14 @@ class Swagger2(swagger.Swagger):
         # Check if this swagger file has paths
         try:
             paths = self.data['paths']
+            logger.debug("Processing Paths Object")
         except KeyError:
             paths = None
         if not paths:
             logger.error("No Paths Object")
             return
 
-        logger.info("Processing Paths Object")
-        self.out.write("node_types:\n")
+        self.out.write("node_types:\n\n")
         indent = "  "
         for name, value in paths.items():
             self.process_path_object(indent, name, value)
@@ -452,11 +453,23 @@ class Swagger2(swagger.Swagger):
         try:
             for group_version_kind in schema['x-kubernetes-group-version-kind']:
                 kind = group_version_kind['kind']
-                logger.info("%s: %s", name, kind)
+                logger.debug("%s: %s", name, kind)
         except KeyError:
             logger.debug("%s: no group version kind", name)
             kind = schema_ref
             pass
+
+        # If this is intended to be a node type, the schema 'type'
+        # better be 'object'
+        try:
+            if not schema['type'] == 'object':
+                logger.error("Trying to create node type '%s' with type '%s'",
+                             kind, schema['type'])
+                return
+        except KeyError:
+                logger.error("Trying to create node type '%s' without a type",
+                             kind)
+                return
 
         self.process_schema_object(indent, kind, schema)
     
@@ -469,20 +482,10 @@ class Swagger2(swagger.Swagger):
         # Make sure this swagger file has definitions
         try:
             definitions = self.data['definitions']
+            logger.debug("Processing Definitions")
         except KeyError:
-            definitions = None
-        if not definitions:
-            logger.info("No Definitions")
+            logger.debug("No Definitions")
             return
-
-        logger.info("Processing Definitions")
-        self.out.write("data_types:\n")
-        indent = "  "
-
-        self.tosca = dict()
-        for name, value in definitions.items():
-            self.process_schema_object(indent, name, value)
-            self.out.write("\n")
 
 
     def process_schema_object(self, indent, name, value):
@@ -644,24 +647,19 @@ class Swagger2(swagger.Swagger):
         except KeyError:
             pass
 
+        # Emit metadata
+        metadata = dict()
         try:
-            meta = value['x-kubernetes-group-version-kind']
-            self.add_meta_data(data, 'x-kubernetes-group-version-kind', meta)
+            metadata['x-kubernetes-group-version-kind'] = value['x-kubernetes-group-version-kind']
         except KeyError:
             pass
-
         try:
-            meta = value['x-kubernetes-union']
-            self.add_meta_data(data, 'x-kubernetes-union', meta)
+            metadata['x-kubernetes-union'] = value['x-kubernetes-union']
         except KeyError:
             pass
+        if metadata: self.emit_metadata(indent, metadata)
 
-        try:
-            meta = value['format']
-            self.add_meta_data(data, 'format', meta)
-        except KeyError:
-            pass
-
+        # Add property definitions
         try:
             properties = value['properties']
             self.add_properties(data, properties)
@@ -676,15 +674,8 @@ class Swagger2(swagger.Swagger):
             pass
 
         self.tosca[name] = data
+        self.out.write("\n")
 
-
-    def add_meta_data(self, data, key, meta):
-        try:
-            metadata = data['metadata']
-        except KeyError:
-            data['metadata'] = dict()
-            metadata = data['metadata']
-        metadata[key] = meta
 
     def add_properties(self, data, properties):
         data['properties'] = dict()
@@ -714,7 +705,7 @@ class Swagger2(swagger.Swagger):
         for field in ['x-kubernetes-list-map-keys', 'format', 'x-kubernetes-list-type', 'x-kubernetes-patch-strategy', 'x-kubernetes-patch-merge-key']:
             try:
                 meta = value[field]
-                self.add_meta_data(data, field, meta)
+#                self.add_meta_data(data, field, meta)
             except KeyError:
                 pass
 
@@ -745,7 +736,7 @@ class Swagger2(swagger.Swagger):
             # Strip prefix
             return ref[len(prefix):]
         else:
-            logger.info("%s: not a ref to a definition", ref)
+            logger.error("%s: not a ref to a definition", ref)
             return ref
 
         
@@ -758,7 +749,7 @@ class Swagger2(swagger.Swagger):
             return self.get_ref(value['$ref'])
         except KeyError:
             pass
-        logger.info("%s: no entry schema found", str(value))
+        logger.error("%s: no entry schema found", str(value))
         return "not found"
 
 
@@ -770,11 +761,11 @@ class Swagger2(swagger.Swagger):
         """
         try:
             parameters = self.data['parameters']
+            logger.debug("Processing Parameters")
         except KeyError:
-            logger.info("No Parameters")
+            logger.debug("No Parameters")
             return
 
-        logger.info("Processing Parameters")
 
     def process_responses(self):
         """Process the Responses Definitions Object which hold responses that
@@ -784,11 +775,11 @@ class Swagger2(swagger.Swagger):
         """
         try:
             responses = self.data['responses']
+            logger.debug("Processing Responses")
         except KeyError:
-            logger.info("No Responses")
+            logger.debug("No Responses")
             return
 
-        logger.info("Processing Responses")
 
     def process_securityDefinitions(self):
         """Process the Security Definitions Object which holds Security scheme
@@ -797,11 +788,11 @@ class Swagger2(swagger.Swagger):
         """
         try:
             securityDefinitions = self.data['securityDefinitions']
+            logger.debug("Processing SecurityDefinitions")
         except KeyError:
-            logger.info("No SecurityDefinitions")
+            logger.debug("No SecurityDefinitions")
             return
 
-        logger.info("Processing SecurityDefinitions")
 
     def process_security(self):
         """Process the Security Requirement Object. This object holds a
@@ -814,11 +805,11 @@ class Swagger2(swagger.Swagger):
         """
         try:
             security = self.data['security']
+            logger.debug("Processing Security")
         except KeyError:
-            logger.info("No Security")
+            logger.debug("No Security")
             return
 
-        logger.info("Processing Security")
 
     def process_tags(self):
         """Process the Tag Object which holds a list of tags used by the
@@ -832,13 +823,11 @@ class Swagger2(swagger.Swagger):
         """
         try:
             tags = self.data['tags']
+            logger.debug("Processing Tags")
         except KeyError:
-            tags = None
-        if not tags:
-            logger.info("No Tags")
+            logger.debug("No Tags")
             return
 
-        logger.info("Processing Tags")
 
     def process_externalDocs(self):
         """Process the External Documentation Object which defines additional
@@ -847,11 +836,11 @@ class Swagger2(swagger.Swagger):
         """
         try:
             externalDocs = self.data['externalDocs']
+            logger.debug("Processing ExternalDocs")
         except KeyError:
-            logger.info("No ExternalDocs")
+            logger.debug("No ExternalDocs")
             return
 
-        logger.info("Processing ExternalDocs")
 
     def emit_description(self, indent, description):
 

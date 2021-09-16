@@ -76,6 +76,7 @@ except KeyError:
     exit(3)
 
 # Convert
+swagger.convert(args.output)
 try:
     swagger.convert(args.output)
 except Exception as e:
