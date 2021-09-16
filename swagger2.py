@@ -480,12 +480,47 @@ class Swagger2(swagger.Swagger):
                              kind)
                 return
 
-        if not schema_ref in self.node_types:
-            self.node_types.add(schema_ref)
-            self.process_schema_object(indent, kind, schema)
-        else:
-            logger.info("%s: DUPLICATE", schema_ref)
-            
+        # Do we already have this one?
+        if schema_ref in self.node_types:
+            logger.debug("%s: DUPLICATE", schema_ref)
+            return
+        
+        # Make sure we define data types for any properties in this
+        # node type
+        self.schedule_data_types(schema)
+
+        # Emit the node type
+        self.node_types.add(schema_ref)
+        self.process_schema_object(indent, kind, schema)
+
+
+    def schedule_data_types(self, schema):
+        """Schedule the creation of a data type for schemas referenced in this
+        schema
+        """
+        # Schemas are referenced by property definitions
+        try:
+            properties = schema['properties']
+        except KeyError:
+            # No properties
+            return
+
+        # Do any properties reference schemas?
+        for property_name, property_value in properties.items():
+            try:
+                # No type specified. Use $ref instead
+                property_type = self.get_ref(property_value['$ref'])
+                self.definitions.add(property_type)
+            except KeyError:
+                # Property schema does not contain a $ref. Items
+                # perhaps?
+                try:
+                    items = property_value['items']
+                    property_type = self.get_ref(items['$ref'])
+                    self.definitions.add(property_type)
+                except KeyError:
+                    pass
+
 
     def process_definitions(self):
         """Process the Definitions Object which holds data types produced and
@@ -500,11 +535,20 @@ class Swagger2(swagger.Swagger):
             logger.debug("No Definitions")
             return
 
-        for key, value in definitions.items():
-            if key in self.definitions:
-                logger.info("%s", key)
-                if key in self.node_types:
+        self.out.write("data_types:\n\n")
+        indent = "  "
+        for definition in self.definitions:
+            try:
+                value = definitions[definition]
+                try:
+                    self.process_schema_object(indent, definition, value)
+                except Exception as e:
+                    # logger.error("%s: %s", definition, str(e))
+                    continue
+                if definition in self.node_types:
                     logger.info("%s is also node type", key)
+            except KeyError:
+                logger.error("Definition %s not found", definition)
 
 
     def process_schema_object(self, indent, name, value):
@@ -706,7 +750,6 @@ class Swagger2(swagger.Swagger):
             try:
                 # No type specified. Use $ref instead
                 property_type = self.get_ref(value['$ref'])
-                self.definitions.add(property_type)
             except KeyError:
                 logger.error("%s: no type", property_name)
                 return
@@ -717,8 +760,8 @@ class Swagger2(swagger.Swagger):
         try:
             self.out.write(
                 "%sentry_schema: %s\n"
-            % (indent, self.get_entry_schema(value['items']))
-        )
+                % (indent, self.get_entry_schema(value['items']))
+            )
         except KeyError:
             pass
         try:
