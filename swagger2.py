@@ -104,6 +104,9 @@ class Swagger2(swagger.Swagger):
         self.node_types = set()
         self.data_types = set()
 
+        # Track definitions from which to create data types
+        self.definitions = set()
+        
         # Process the Swagger object
         self.process_info()            
         self.process_host()
@@ -497,6 +500,12 @@ class Swagger2(swagger.Swagger):
             logger.debug("No Definitions")
             return
 
+        for key, value in definitions.items():
+            if key in self.definitions:
+                logger.info("%s", key)
+                if key in self.node_types:
+                    logger.info("%s is also node type", key)
+
 
     def process_schema_object(self, indent, name, value):
         """A Schema Object in Swagger 2 has the following:
@@ -692,20 +701,19 @@ class Swagger2(swagger.Swagger):
         )
         indent = indent + '  '
         try:
-            self.out.write(
-                "%stype: %s\n"
-            % (indent, self.get_type(value['type']))
-        )
+            property_type = self.get_type(value['type'])
         except KeyError:
-            # No type specified
             try:
-                self.out.write(
-                    "%stype: %s\n"
-                    % (indent, self.get_ref(value['$ref']))
-                )
+                # No type specified. Use $ref instead
+                property_type = self.get_ref(value['$ref'])
+                self.definitions.add(property_type)
             except KeyError:
-                # No $ref either
                 logger.error("%s: no type", property_name)
+                return
+        self.out.write(
+            "%stype: %s\n"
+            % (indent, property_type)
+        )
         try:
             self.out.write(
                 "%sentry_schema: %s\n"
