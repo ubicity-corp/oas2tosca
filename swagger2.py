@@ -688,7 +688,15 @@ class Swagger2(swagger.Swagger):
             % (indent, self.get_type(value['type']))
         )
         except KeyError:
-            pass
+            # No type specified
+            try:
+                self.out.write(
+                    "%stype: %s\n"
+                    % (indent, self.get_ref(value['$ref']))
+                )
+            except KeyError:
+                # No $ref either
+                logger.error("%s: no type", property_name)
         try:
             self.out.write(
                 "%sentry_schema: %s\n"
