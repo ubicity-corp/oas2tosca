@@ -99,7 +99,12 @@ class Swagger2(swagger.Swagger):
         """
         # Open the output file
         self.open(output_file_name)
-        
+
+        # Track types to avoid creating duplicates
+        self.node_types = set()
+        self.data_types = set()
+
+        # Process the Swagger object
         self.process_info()            
         self.process_host()
         self.process_basePath()
@@ -444,8 +449,8 @@ class Swagger2(swagger.Swagger):
                 logger.error("%s not found", schema_ref)
                 return
         except KeyError:
+            logger.error("%s does not have a schema reference", name)
             schema_ref = name
-            # Not a schema reference
             pass
 
         # For k8s resources, get the name of the resource from the
@@ -472,8 +477,12 @@ class Swagger2(swagger.Swagger):
                              kind)
                 return
 
-        self.process_schema_object(indent, kind, schema)
-    
+        if not schema_ref in self.node_types:
+            self.node_types.add(schema_ref)
+            self.process_schema_object(indent, kind, schema)
+        else:
+            logger.info("%s: DUPLICATE", schema_ref)
+            
 
     def process_definitions(self):
         """Process the Definitions Object which holds data types produced and
