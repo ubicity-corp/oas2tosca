@@ -160,7 +160,7 @@ class Swagger2(swagger.Swagger):
 
     def emit_key_value_data(self, indent, data):
         for key, value in data.items():
-            if isinstance(value, (str, list)):
+            if isinstance(value, str):
                 self.out.write("%s%s: %s\n" %
                                (indent, key, value))
             else:
@@ -449,11 +449,12 @@ class Swagger2(swagger.Swagger):
             pass
 
         # For k8s resources, get the name of the resource from the
-        # 'x-kubernetes-group-version-kind' attribute.
+        # 'x-kubernetes-group-version-kind' attribute. Note that the
+        # value of 'x-kubernetes-group-version-kind' is a list. Not
+        # sure why.
         try:
-            for group_version_kind in schema['x-kubernetes-group-version-kind']:
-                kind = group_version_kind['kind']
-                logger.debug("%s: %s", name, kind)
+            group_version_kind = schema['x-kubernetes-group-version-kind'][0]
+            kind = group_version_kind['kind']
         except KeyError:
             logger.debug("%s: no group version kind", name)
             kind = schema_ref
@@ -630,8 +631,6 @@ class Swagger2(swagger.Swagger):
           instance for this schema
         """
 
-        data = dict()
-
         self.out.write("%s%s:\n" % (indent, name))
         indent = indent + '  '
 
@@ -647,58 +646,59 @@ class Swagger2(swagger.Swagger):
         except KeyError:
             pass
 
-        # Emit metadata
+        # Emit 'x-kubernetes-group-kind' as metadata
         metadata = dict()
-        try:
-            metadata['x-kubernetes-group-version-kind'] = value['x-kubernetes-group-version-kind']
-        except KeyError:
-            pass
-        try:
-            metadata['x-kubernetes-union'] = value['x-kubernetes-union']
-        except KeyError:
-            pass
-        if metadata: self.emit_metadata(indent, metadata)
+        # x-kubernetes-group-version-kind is a list for some reason
+        metadata['x-kubernetes-group-version-kind'] = value['x-kubernetes-group-version-kind'][0]
+        self.emit_metadata(indent, metadata)
 
         # Add property definitions
         try:
             properties = value['properties']
-            self.add_properties(data, properties)
             try:
                 required = value['required']
-                for property_name in required:
-                    property = data['properties'][property_name]
-                    property['required'] = True
             except KeyError:
-                pass
+                required = list()
+            self.add_properties(indent, properties, required)
         except KeyError:
+            # No properties
             pass
 
-        self.tosca[name] = data
         self.out.write("\n")
 
 
-    def add_properties(self, data, properties):
-        data['properties'] = dict()
+    def add_properties(self, indent, properties, required):
+        self.out.write(
+            "%sproperties:\n"
+            % indent
+        )
+        indent = indent + '  '
         for property_name, property_value in properties.items():
-            self.add_property(data['properties'], property_name, property_value)
+            self.add_property(indent, property_name, property_value, required)
             
-    def add_property(self, properties, property_name, value):
-        data = dict()
-        properties[property_name] = data
+    def add_property(self, indent, property_name, value, required):
+        self.out.write(
+            "%s%s:\n"
+            % (indent, property_name)
+        )
+        indent = indent + '  '
         try:
-            data['type'] = self.get_type(value['type'])
+            self.out.write(
+                "%stype: %s\n"
+            % (indent, self.get_type(value['type']))
+        )
         except KeyError:
             pass
         try:
-            data['entry_schema'] = self.get_entry_schema(value['items'])
+            self.out.write(
+                "%sentry_schema: %s\n"
+            % (indent, self.get_entry_schema(value['items']))
+        )
         except KeyError:
             pass
         try:
-            data['type'] = self.get_ref(value['$ref'])
-        except KeyError:
-            pass
-        try:
-            data['description'] = value['description']
+            description = value['description']
+            self.emit_description(indent, description)
         except KeyError:
             pass
         # Everything else is metadata
