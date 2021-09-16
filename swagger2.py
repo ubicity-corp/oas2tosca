@@ -540,15 +540,12 @@ class Swagger2(swagger.Swagger):
         for definition in self.definitions:
             try:
                 value = definitions[definition]
-                try:
-                    self.process_schema_object(indent, definition, value)
-                except Exception as e:
-                    # logger.error("%s: %s", definition, str(e))
-                    continue
-                if definition in self.node_types:
-                    logger.info("%s is also node type", key)
             except KeyError:
                 logger.error("Definition %s not found", definition)
+                continue
+            self.process_schema_object(indent, definition, value)
+            if definition in self.node_types:
+                logger.info("%s is also node type", key)
 
 
     def process_schema_object(self, indent, name, value):
@@ -710,9 +707,12 @@ class Swagger2(swagger.Swagger):
 
         # Emit 'x-kubernetes-group-kind' as metadata
         metadata = dict()
-        # x-kubernetes-group-version-kind is a list for some reason
-        metadata['x-kubernetes-group-version-kind'] = value['x-kubernetes-group-version-kind'][0]
-        self.emit_metadata(indent, metadata)
+        try:
+            # x-kubernetes-group-version-kind is a list for some reason
+            metadata['x-kubernetes-group-version-kind'] = value['x-kubernetes-group-version-kind'][0]
+            self.emit_metadata(indent, metadata)
+        except KeyError:
+            pass
 
         # Add property definitions
         try:
