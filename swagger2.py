@@ -456,6 +456,11 @@ class Swagger2(swagger.Swagger):
             schema_ref = name
             pass
 
+        # Do we already have this one?
+        if schema_ref in self.node_types:
+            logger.debug("%s: DUPLICATE", schema_ref)
+            return
+        
         # For k8s resources, get the name of the resource from the
         # 'x-kubernetes-group-version-kind' attribute. Note that the
         # value of 'x-kubernetes-group-version-kind' is a list. Not
@@ -480,11 +485,6 @@ class Swagger2(swagger.Swagger):
                              kind)
                 return
 
-        # Do we already have this one?
-        if schema_ref in self.node_types:
-            logger.debug("%s: DUPLICATE", schema_ref)
-            return
-        
         # Make sure we define data types for any properties in this
         # node type
         self.schedule_data_types(schema)
@@ -543,9 +543,127 @@ class Swagger2(swagger.Swagger):
             except KeyError:
                 logger.error("Definition %s not found", definition)
                 continue
-            self.process_schema_object(indent, definition, value)
+            self.create_data_type_from_schema(indent, definition, value)
             if definition in self.node_types:
                 logger.info("%s is also node type", key)
+
+
+    def create_data_type_from_schema(self, indent, name, schema):
+        """Create a TOSCA data type from a JSON Schema"""
+
+        # Make sure this schema doesn't just reference another schema
+        try:
+            ref = schema['$ref']
+            logger.error("%s references %s", name, ref)
+            return
+        except KeyError:
+            pass
+
+        # Avoid duplicates
+        if name in self.data_types:
+            logger.debug("%s: duplicate", name)
+            return
+        self.data_types.add(name)
+        
+        # Remaining definitions depend on the schema type
+        try:
+            schema_type = schema['type']
+            if schema_type == 'object':
+                self.create_data_type_from_object(indent, name, schema)
+            elif schema_type == "string":
+                self.create_data_type_from_string(indent, name, schema)
+            elif schema_type == "array":
+                self.create_data_type_from_array(indent, name, schema)
+            elif schema_type == "integer":
+                self.create_data_type_from_integer(indent, name, schema)
+            elif schema_type == "number":
+                self.create_data_type_from_number(indent, name, schema)
+            elif schema_type == "boolean":
+                self.create_data_type_from_boolean(indent, name, schema)
+            elif schema_type == "null":
+                self.create_data_type_from_null(indent, name, schema)
+            else:
+                logger.error("%s: unknown type '%s'", name, schema_type)
+                return
+        except KeyError:
+            # No type specified. Could be any type
+            self.create_data_type_from_any(indent, name, schema)
+
+
+    def create_data_type_from_object(self, indent, name, schema):
+        """Create a TOSCA data type from a JSON Schema Object"""
+
+        # Make sure we define data types for any properties in this
+        # node type
+        self.create_data_types(indent, schema)
+
+        # Emit the property definitions
+        self.process_schema_object(indent, name, schema)
+
+
+    def create_data_type_from_string(self, indent, name, schema):
+        """Create a TOSCA data type from a JSON Schema String"""
+        logger.info("%s: string not implemented", name)
+        
+    def create_data_type_from_array(self, indent, name, schema):
+        """Create a TOSCA data type from a JSON Schema array"""
+        logger.info("%s: array not implemented", name)
+
+    def create_data_type_from_number(self, indent, name, schema):
+        """Create a TOSCA data type from a JSON Schema number"""
+        logger.info("%s: number not implemented", name)
+
+    def create_data_type_from_integer(self, indent, name, schema):
+        """Create a TOSCA data type from a JSON Schema integer"""
+        logger.info("%s: integer not implemented", name)
+
+    def create_data_type_from_boolean(self, indent, name, schema):
+        """Create a TOSCA data type from a JSON Schema boolean"""
+        logger.info("%s: boolean not implemented", name)
+
+    def create_data_type_from_null(self, indent, name, schema):
+        """Create a TOSCA data type from a JSON Schema null"""
+        logger.info("%s: null not implemented", name)
+
+    def create_data_type_from_any(self, indent, name, schema):
+        """Create a TOSCA data type from a JSON Schema any type"""
+        logger.info("%s: any not implemented", name)
+
+
+    def create_data_types(self, indent, schema):
+        """Create data types for schemas referenced in this schema
+
+        """
+        # Schemas are referenced by property definitions
+        try:
+            properties = schema['properties']
+        except KeyError:
+            # No properties
+            return
+
+        # Do any properties reference schemas?
+        for property_name, property_value in properties.items():
+            try:
+                # No type specified. Use $ref instead
+                property_type = self.get_ref(property_value['$ref'])
+                if not property_type in self.data_types:
+                    self.create_data_type_from_schema(indent, property_type,
+                                                      self.data['definitions'][property_type])
+                else:
+                    logger.debug("Duplicate %s", property_type)
+            except KeyError:
+                # Property schema does not contain a $ref. Items
+                # perhaps?
+                try:
+                    items = property_value['items']
+                    property_type = self.get_ref(items['$ref'])
+                    if not property_type in self.data_types:
+                        self.create_data_type_from_schema(indent, property_type,
+                                                          self.data['definitions'][property_type])
+                    else:
+                        logger.debug("Duplicate %s", property_type)
+                except KeyError:
+                    pass
 
 
     def process_schema_object(self, indent, name, value):
@@ -694,17 +812,17 @@ class Swagger2(swagger.Swagger):
         indent = indent + '  '
 
         try:
-            derived_from = self.get_type(value['type'])
-            self.out.write("%sderived_from: %s\n" % (indent, derived_from))
-        except KeyError:
-            pass
-        
-        try:
             description = value['description']
             self.emit_description(indent, description)
         except KeyError:
             pass
 
+        try:
+            derived_from = self.get_type(value['type'])
+            self.out.write("%sderived_from: %s\n" % (indent, derived_from))
+        except KeyError:
+            pass
+        
         # Emit 'x-kubernetes-group-kind' as metadata
         metadata = dict()
         try:
