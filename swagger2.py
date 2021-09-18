@@ -428,40 +428,60 @@ class Swagger2(swagger.Swagger):
 
         # We create a node type for any resource that has a POST
         # operation with a 'body' parameter
-        if value['in'] == 'body':
-            schema = value['schema']
-        else:
+        if not value['in'] == 'body':
             return
 
         # We have an operation that can create a resource. Create a
-        # node type based on the body schema.
-        self.process_schema_for_node_type(indent, name, schema)
-
-
-    def process_schema_for_node_type(self, indent, name, schema):
-        
-        # Check to see if this schema references another schema (in
-        # which case all other properties in this schema object must
-        # be ignored according to the JSONSchema spec)
+        # node type based on the body schema. For now, we only handle
+        # schemas that reference another schema (in which case all
+        # other properties in this schema object must be ignored
+        # according to the JSONSchema spec)
+        schema = value['schema']
         try:
             ref = schema['$ref']
-            schema_ref = self.get_ref(ref)
-            try:
-                schema = self.data['definitions'][schema_ref]
-            except KeyError:
-                logger.error("%s not found", schema_ref)
-                return
         except KeyError:
-            logger.error("%s does not have a schema reference", name)
-            schema_ref = name
-            pass
-
-        # Do we already have this one?
-        if schema_ref in self.node_types:
-            logger.debug("%s: DUPLICATE", schema_ref)
+            logger.error("%s: creating node type from in-place schema not implemented",
+                         name)
             return
         
-        # For k8s resources, get the name of the resource from the
+        # Get the referenced schema
+        schema_ref = self.get_ref(ref)
+        try:
+            node_type_schema = self.data['definitions'][schema_ref]
+        except KeyError:
+            logger.error("%s: not found", schema_ref)
+            return
+        
+        # Create the node type for the referenced schema
+        self.create_node_type_from_schema(indent, schema_ref, node_type_schema)
+        
+
+    def create_node_type_from_schema(self, indent, name, schema):
+        
+        # Avoid duplicates
+        if name in self.node_types:
+            logger.info("%s: duplicate", name)
+            return
+        self.node_types.add(name)
+        
+        # If this is intended to be a node type, the schema 'type'
+        # better be 'object'
+        try:
+            if not schema['type'] == 'object':
+                logger.error("Trying to create node type '%s' with type '%s'",
+                             name, schema['type'])
+                return
+        except KeyError:
+                logger.error("Trying to create node type '%s' without a type",
+                             name)
+                return
+
+        # Make sure we plan to define data types for any properties in
+        # this schema
+        self.plan_data_types_for_properties(schema)
+
+        # For k8s
+        # resources, we get the name of the resource from the
         # 'x-kubernetes-group-version-kind' attribute. Note that the
         # value of 'x-kubernetes-group-version-kind' is a list. Not
         # sure why.
@@ -470,32 +490,34 @@ class Swagger2(swagger.Swagger):
             kind = group_version_kind['kind']
         except KeyError:
             logger.debug("%s: no group version kind", name)
-            kind = schema_ref
-            pass
+            return
 
-        # If this is intended to be a node type, the schema 'type'
-        # better be 'object'
+        # For now, we only handle v1
         try:
-            if not schema['type'] == 'object':
-                logger.error("Trying to create node type '%s' with type '%s'",
-                             kind, schema['type'])
+            version = group_version_kind['version']
+            if not version == 'v1':
+                logger.info("Ignoring %s version of %s", version, kind)
                 return
         except KeyError:
-                logger.error("Trying to create node type '%s' without a type",
-                             kind)
-                return
-
-        # Make sure we define data types for any properties in this
-        # node type
-        self.schedule_data_types(schema)
-
+            logger.error("VERSION")
+            return
+        
+        # Write 'name', 'description', and 'derived_from'.
+        self.out.write("%s%s:\n" % (indent, kind))
+        indent = indent + '  '
+        try:
+            description = schema['description']
+            self.emit_description(indent, description)
+        except KeyError:
+            pass
+        self.out.write("%sderived_from: tosca.nodes.Root\n" % indent)
+        
         # Emit the node type
-        self.node_types.add(schema_ref)
         self.process_schema_object(indent, kind, schema)
 
 
-    def schedule_data_types(self, schema):
-        """Schedule the creation of a data type for schemas referenced in this
+    def plan_data_types_for_properties(self, schema):
+        """Plan the creation of a data type for schemas referenced in this
         schema
         """
         # Schemas are referenced by property definitions
@@ -565,6 +587,19 @@ class Swagger2(swagger.Swagger):
             return
         self.data_types.add(name)
         
+        # Make sure we define data types for any properties defined in
+        # this schema
+        self.create_data_types_for_properties(indent, schema)
+
+        # Write name and description
+        self.out.write("%s%s:\n" % (indent, name))
+        indent = indent + '  '
+        try:
+            description = schema['description']
+            self.emit_description(indent, description)
+        except KeyError:
+            pass
+
         # Remaining definitions depend on the schema type
         try:
             schema_type = schema['type']
@@ -593,48 +628,74 @@ class Swagger2(swagger.Swagger):
     def create_data_type_from_object(self, indent, name, schema):
         """Create a TOSCA data type from a JSON Schema Object"""
 
-        # Make sure we define data types for any properties in this
-        # node type
-        self.create_data_types(indent, schema)
-
-        # Emit the property definitions
+        # Don't need 'derived_from'. Just emit the property
+        # definitions
         self.process_schema_object(indent, name, schema)
 
 
     def create_data_type_from_string(self, indent, name, schema):
         """Create a TOSCA data type from a JSON Schema String"""
-        logger.info("%s: string not implemented", name)
+
+        # This type is derived from string
+        self.out.write("%sderived_from: string\n" % indent )
+
+        # To Be Completed
+        logger.info("%s: string not fully implemented", name)
         
     def create_data_type_from_array(self, indent, name, schema):
         """Create a TOSCA data type from a JSON Schema array"""
-        logger.info("%s: array not implemented", name)
+
+        # This type is derived from list
+        self.out.write("%sderived_from: list\n" % indent )
+
+        logger.info("%s: array not fully implemented", name)
 
     def create_data_type_from_number(self, indent, name, schema):
         """Create a TOSCA data type from a JSON Schema number"""
+
+        # This type is derived from float
+        self.out.write("%sderived_from: float\n" % indent )
+
         logger.info("%s: number not implemented", name)
 
     def create_data_type_from_integer(self, indent, name, schema):
         """Create a TOSCA data type from a JSON Schema integer"""
+
+        # This type is derived from integer
+        self.out.write("%sderived_from: integer\n" % indent )
+
         logger.info("%s: integer not implemented", name)
 
     def create_data_type_from_boolean(self, indent, name, schema):
         """Create a TOSCA data type from a JSON Schema boolean"""
+
+        # This type is derived from boolean
+        self.out.write("%sderived_from: boolean\n" % indent )
+
         logger.info("%s: boolean not implemented", name)
 
     def create_data_type_from_null(self, indent, name, schema):
         """Create a TOSCA data type from a JSON Schema null"""
+
+        # This type is derived from null
+        self.out.write("%sderived_from: null\n" % indent )
+
         logger.info("%s: null not implemented", name)
 
     def create_data_type_from_any(self, indent, name, schema):
         """Create a TOSCA data type from a JSON Schema any type"""
+
+        # This type is derived from any type. Given the lack of 'any'
+        # in TOSCA, we'll just use 'string'
+        self.out.write("%sderived_from: string\n" % indent )
+
         logger.info("%s: any not implemented", name)
 
 
-    def create_data_types(self, indent, schema):
-        """Create data types for schemas referenced in this schema
-
+    def create_data_types_for_properties(self, indent, schema):
+        """Create data types for property schemas referenced in this schema
         """
-        # Schemas are referenced by property definitions
+        # Does this schema have property definitions?
         try:
             properties = schema['properties']
         except KeyError:
@@ -642,10 +703,9 @@ class Swagger2(swagger.Swagger):
             return
 
         # Do any properties reference schemas?
-        for property_name, property_value in properties.items():
+        for property_name, property_schema in properties.items():
             try:
-                # No type specified. Use $ref instead
-                property_type = self.get_ref(property_value['$ref'])
+                property_type = self.get_ref(property_schema['$ref'])
                 if not property_type in self.data_types:
                     self.create_data_type_from_schema(indent, property_type,
                                                       self.data['definitions'][property_type])
@@ -655,7 +715,7 @@ class Swagger2(swagger.Swagger):
                 # Property schema does not contain a $ref. Items
                 # perhaps?
                 try:
-                    items = property_value['items']
+                    items = property_schema['items']
                     property_type = self.get_ref(items['$ref'])
                     if not property_type in self.data_types:
                         self.create_data_type_from_schema(indent, property_type,
@@ -808,21 +868,6 @@ class Swagger2(swagger.Swagger):
           instance for this schema
         """
 
-        self.out.write("%s%s:\n" % (indent, name))
-        indent = indent + '  '
-
-        try:
-            description = value['description']
-            self.emit_description(indent, description)
-        except KeyError:
-            pass
-
-        try:
-            derived_from = self.get_type(value['type'])
-            self.out.write("%sderived_from: %s\n" % (indent, derived_from))
-        except KeyError:
-            pass
-        
         # Emit 'x-kubernetes-group-kind' as metadata
         metadata = dict()
         try:
@@ -853,8 +898,8 @@ class Swagger2(swagger.Swagger):
             % indent
         )
         indent = indent + '  '
-        for property_name, property_value in properties.items():
-            self.add_property(indent, property_name, property_value, required)
+        for property_name, property_schema in properties.items():
+            self.add_property(indent, property_name, property_schema, required)
             
     def add_property(self, indent, property_name, value, required):
         self.out.write(
@@ -1045,7 +1090,7 @@ class Swagger2(swagger.Swagger):
         of multiple lines or if it includes a colon character (or some
         other character that would violate YAML syntax)
         """
-        if len(lines) > 1 or (':' in lines[0]) or ('\'' in lines[0]):
+        if len(lines) > 1 or (':' in lines[0]) or ('\'' in lines[0]) or ('\'' in lines[0]) or ('`' in lines[0]):
             # Emit folding character
             self.out.write(">-\n")
             # Emit individual lines. Make sure the first line is indented
