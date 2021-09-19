@@ -570,29 +570,36 @@ class Swagger2(swagger.Swagger):
                 logger.info("%s is also node type", key)
 
 
-    def create_data_type_from_schema(self, indent, name, schema):
+    def create_data_type_from_schema(self, indent, schema_name, schema):
         """Create a TOSCA data type from a JSON Schema"""
 
         # Make sure this schema doesn't just reference another schema
         try:
             ref = schema['$ref']
-            logger.error("%s references %s", name, ref)
+            logger.error("%s references %s", schema_name, ref)
             return
         except KeyError:
             pass
 
         # Avoid duplicates
-        if name in self.data_types:
-            logger.debug("%s: duplicate", name)
+        if schema_name in self.data_types:
+            logger.debug("%s: duplicate", schema_name)
             return
-        self.data_types.add(name)
+        self.data_types.add(schema_name)
         
         # Make sure we define data types for any properties defined in
         # this schema
         self.create_data_types_for_properties(indent, schema)
 
-        # Write name and description
-        self.out.write("%s%s:\n" % (indent, name))
+        # Parse group, version, and kind from the schema name
+        group, version, kind = parse_schema_name(schema_name)
+
+        # We only handle v1 for now
+        if version != "v1":
+            return
+        
+        # Write kind and description
+        self.out.write("%s%s:\n" % (indent, kind))
         indent = indent + '  '
         try:
             description = schema['description']
@@ -604,25 +611,25 @@ class Swagger2(swagger.Swagger):
         try:
             schema_type = schema['type']
             if schema_type == 'object':
-                self.create_data_type_from_object(indent, name, schema)
+                self.create_data_type_from_object(indent, kind, schema)
             elif schema_type == "string":
-                self.create_data_type_from_string(indent, name, schema)
+                self.create_data_type_from_string(indent, kind, schema)
             elif schema_type == "array":
-                self.create_data_type_from_array(indent, name, schema)
+                self.create_data_type_from_array(indent, kind, schema)
             elif schema_type == "integer":
-                self.create_data_type_from_integer(indent, name, schema)
+                self.create_data_type_from_integer(indent, kind, schema)
             elif schema_type == "number":
-                self.create_data_type_from_number(indent, name, schema)
+                self.create_data_type_from_number(indent, kind, schema)
             elif schema_type == "boolean":
-                self.create_data_type_from_boolean(indent, name, schema)
+                self.create_data_type_from_boolean(indent, kind, schema)
             elif schema_type == "null":
-                self.create_data_type_from_null(indent, name, schema)
+                self.create_data_type_from_null(indent, kind, schema)
             else:
-                logger.error("%s: unknown type '%s'", name, schema_type)
+                logger.error("%s: unknown type '%s'", kind, schema_type)
                 return
         except KeyError:
             # No type specified. Could be any type
-            self.create_data_type_from_any(indent, name, schema)
+            self.create_data_type_from_any(indent, kind, schema)
 
 
     def create_data_type_from_object(self, indent, name, schema):
@@ -1127,5 +1134,22 @@ def wrap_text(text_string):
 
     # Not already formatted. Wrap it ourselves.
     return textwrap.wrap(text_string)
+
+
+def parse_schema_name(schema_name):
+    """Parse schema name into 'group', 'version', 'kind' tuple.
+    """
+
+    # Split schema name
+    split = schema_name.split('.')
+    length = len(split)
+    if length < 2:
+        return "", "", schema_name
+
+    # Return tuple
+    group = ".".join(split[0:length-2])
+    version = split[length-2]
+    kind = split[length-1]
+    return (group, version, kind)
 
 
