@@ -137,6 +137,8 @@ class Swagger2(swagger.Swagger):
 
     def create_profile_directories(self, top):
         for profile in self.profiles.keys():
+
+            # Create a path to the profile directory
             path = profile.split('.')
             profile_dir = os.path.join(top, *path)
             try:
@@ -145,7 +147,12 @@ class Swagger2(swagger.Swagger):
             except Exception as e:
                 logger.error("%s: %s", profile_dir, str(e))
                 pass
+
+            # Open a profile.yaml file
+            profile_file = os.path.join(profile_dir, 'profile.yaml')
+            fd = open(profile_file, "w")
         
+
     def get_profile_names(self):
         """Scan the 'definitions' section of the Swagger object and parse out
         the 'group' section of each schema definition. We will use
