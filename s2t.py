@@ -27,7 +27,7 @@ parser.add_argument('-d', '--debug', action='store_true', default=False,
                     help='turn on debug logging')
 
 parser.add_argument('-i', '--input', action='store', help='swagger input file')
-parser.add_argument('-o', '--output', action='store', help='tosca output file')
+parser.add_argument('-o', '--output', action='store', help='tosca output directory')
 
 #
 # Parse command line

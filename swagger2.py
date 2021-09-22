@@ -11,6 +11,10 @@ __status__ = "Prototype"
 import logging
 logger = logging.getLogger(__name__)
 
+# Directory support
+import os
+import os.path
+
 # System support
 import swagger
 
@@ -19,10 +23,11 @@ import textwrap
 
 class Swagger2(swagger.Swagger):
 
-    def convert(self, output_file_name):
-        """Convert a Swagger v2 object to TOSCA type definitions and write to
-        the file specified by 'output_file_name'. A swagger 2 object
-        is has the following properties:
+    def convert(self, top):
+        """Convert a Swagger v2 object to TOSCA type definitions and write
+        these definitions to profile directories under 'top'.
+
+        A swagger 2 object is has the following properties:
 
         swagger(string): Required. Specifies the Swagger Specification
           version being used. It can be used by the Swagger UI and
@@ -97,12 +102,15 @@ class Swagger2(swagger.Swagger):
           external documentation.
 
         """
-        # Open the output file
-        self.open(output_file_name)
+        # Get the names of the profiles that need to be created and
+        # their dependencies on other profiles
+        self.get_profile_names()
 
-        # Track profiles and their dependencies
-        # self.get_profiles()
-    
+        # Create the directories within which each profile will be
+        # created.
+        self.create_profile_directories(top)
+        return
+
         # Track types to avoid creating duplicates
         self.node_types = set()
         self.data_types = set()
@@ -126,7 +134,26 @@ class Swagger2(swagger.Swagger):
         self.process_tags()
         self.process_externalDocs()
 
-    def get_profiles(self):
+
+    def create_profile_directories(self, top):
+        for profile in self.profiles.keys():
+            path = profile.split('.')
+            profile_dir = os.path.join(top, *path)
+            try:
+                logger.info("Create directory %s", profile_dir)
+                os.makedirs(profile_dir, exist_ok=True)
+            except Exception as e:
+                logger.error("%s: %s", profile_dir, str(e))
+                pass
+        
+    def get_profile_names(self):
+        """Scan the 'definitions' section of the Swagger object and parse out
+        the 'group' section of each schema definition. We will use
+        that group name as the profile name. For each schema, we also
+        find the schemas used in property definitions. The group names
+        of those schemas determine other profiles on which each
+        profile depends
+        """
 
         self.profiles = dict()
 
@@ -136,22 +163,23 @@ class Swagger2(swagger.Swagger):
         except KeyError:
             logger.debug("No Definitions")
             return
+
+        # Process each schema definition
         for schema_name, schema in definitions.items():
             self.process_schema(schema_name, schema)
 
-        for profile, dependencies in self.profiles.items():
-            logger.info("%s: %s", profile, dependencies )
-
 
     def process_schema(self, schema_name, schema):
-        # Parse
+        # Extract the group name from the schema name. This group name
+        # will be used as the profile name.
         group, version, kind, prefix = parse_schema_name(schema_name)
         if not group:
             logger.error("%s: no group", schema_name)
             return
 
+        # We only handle 'v1' schemas for now
         if version and version != "v1":
-            logger.error("Ignoring %s", schema_name)
+            logger.debug("Ignoring %s", schema_name)
             return
 
         # Add dependencies for this profile
@@ -608,31 +636,6 @@ class Swagger2(swagger.Swagger):
                 except KeyError:
                     pass
 
-
-    def process_definitions(self):
-        """Process the Definitions Object which holds data types produced and
-        consumed by operations.
-
-        """
-        # Make sure this swagger file has definitions
-        try:
-            definitions = self.data['definitions']
-            logger.debug("Processing Definitions")
-        except KeyError:
-            logger.debug("No Definitions")
-            return
-
-        self.out.write("data_types:\n\n")
-        indent = "  "
-        for definition in self.definitions:
-            try:
-                value = definitions[definition]
-            except KeyError:
-                logger.error("Definition %s not found", definition)
-                continue
-            self.create_data_type_from_schema(indent, definition, value)
-            if definition in self.node_types:
-                logger.info("%s is also node type", key)
 
 
     def create_data_type_from_schema(self, indent, schema_name, schema):
