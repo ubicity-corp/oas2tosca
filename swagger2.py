@@ -100,6 +100,9 @@ class Swagger2(swagger.Swagger):
         # Open the output file
         self.open(output_file_name)
 
+        # Track profiles and their dependencies
+        # self.get_profiles()
+    
         # Track types to avoid creating duplicates
         self.node_types = set()
         self.data_types = set()
@@ -123,7 +126,69 @@ class Swagger2(swagger.Swagger):
         self.process_tags()
         self.process_externalDocs()
 
-        
+    def get_profiles(self):
+
+        self.profiles = dict()
+
+        # Make sure this swagger file has definitions
+        try:
+            definitions = self.data['definitions']
+        except KeyError:
+            logger.debug("No Definitions")
+            return
+        for schema_name, schema in definitions.items():
+            self.process_schema(schema_name, schema)
+
+        for profile, dependencies in self.profiles.items():
+            logger.info("%s: %s", profile, dependencies )
+
+
+    def process_schema(self, schema_name, schema):
+        # Parse
+        group, version, kind, prefix = parse_schema_name(schema_name)
+        if not group:
+            logger.error("%s: no group", schema_name)
+            return
+
+        if version and version != "v1":
+            logger.error("Ignoring %s", schema_name)
+            return
+
+        # Add dependencies for this profile
+        try:
+            dependencies = self.profiles[group]
+        except KeyError:
+            dependencies = set()
+            self.profiles[group] = dependencies
+
+        # Schemas are referenced by property definitions
+        try:
+            properties = schema['properties']
+        except KeyError:
+            # No properties
+            return
+
+        # Do any properties reference schemas?
+        for property_name, property_value in properties.items():
+            try:
+                # No type specified. Use $ref instead
+                property_type = self.get_ref(property_value['$ref'])
+                property_group, version, kind, prefix = parse_schema_name(property_type)
+                if group != property_group:
+                    dependencies.add(property_group)
+            except KeyError:
+                # Property schema does not contain a $ref. Items
+                # perhaps?
+                try:
+                    items = property_value['items']
+                    property_type = self.get_ref(items['$ref'])
+                    property_group, version, kind, prefix = parse_schema_name(property_type)
+                    if group != property_group:
+                        dependencies.add(property_group)
+                except KeyError:
+                    pass
+
+
     def process_info(self):
         """Process the (required) Info Object. This object provides metadata
         about the API. The metadata can be used by the clients if
@@ -592,7 +657,7 @@ class Swagger2(swagger.Swagger):
         self.create_data_types_for_properties(indent, schema)
 
         # Parse group, version, and kind from the schema name
-        group, version, kind = parse_schema_name(schema_name)
+        group, version, kind, prefix = parse_schema_name(schema_name)
 
         # We only handle v1 for now
         if version != "v1":
@@ -1137,19 +1202,28 @@ def wrap_text(text_string):
 
 
 def parse_schema_name(schema_name):
-    """Parse schema name into 'group', 'version', 'kind' tuple.
+    """Parse schema name into 'group', 'version', 'kind', and 'prefix'
+    tuple.
     """
 
-    # Split schema name
+    # Split schema name using '.' separator
     split = schema_name.split('.')
     length = len(split)
-    if length < 2:
-        return "", "", schema_name
 
-    # Return tuple
-    group = ".".join(split[0:length-2])
-    version = split[length-2]
+    # Don't bother splitting if there are not enough parts.
+    if length < 3:
+        return "", "", schema_name, ""
+        
+    # Versions start with 'v1' or 'v2'
+    if split[length-2][:2] == 'v1' or split[length-2][:2] == 'v2':
+        version = split[length-2]
+        prefix = split[length-3]
+        group = ".".join(split[0:length-2])
+    else:
+        version = ""
+        prefix = split[length-2]
+        group = ".".join(split[0:length-1])
     kind = split[length-1]
-    return (group, version, kind)
+    return (group, version, kind, prefix)
 
 
