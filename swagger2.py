@@ -979,23 +979,29 @@ class Swagger2(swagger.Swagger):
             % (indent, property_name)
         )
         indent = indent + '  '
+        # Write property type
         try:
-            property_type = self.get_type(value['type'])
+            type_name = self.get_type(value['type'])
         except KeyError:
             try:
                 # No type specified. Use $ref instead
-                property_type = self.get_ref(value['$ref'])
+                schema_name = self.get_ref(value['$ref'])
+                group, version, kind, prefix = parse_schema_name(schema_name)
+                type_name = kind
             except KeyError:
                 logger.error("%s: no type", property_name)
                 return
         self.out.write(
             "%stype: %s\n"
-            % (indent, property_type)
+            % (indent, type_name)
         )
+        # Write entry schema
         try:
+            entry_schema = self.get_entry_schema(value['items'])
+            group, version, kind, prefix = parse_schema_name(entry_schema)
             self.out.write(
                 "%sentry_schema: %s\n"
-                % (indent, self.get_entry_schema(value['items']))
+                % (indent, kind)
             )
         except KeyError:
             pass
