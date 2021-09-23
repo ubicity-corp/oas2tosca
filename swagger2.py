@@ -101,16 +101,6 @@ class Swagger2(swagger.Swagger):
           external documentation.
 
         """
-        # Get the names of the profiles that need to be created and
-        # their dependencies on other profiles
-        self.get_profile_names()
-
-        # Create the directories within which each profile will be
-        # created.
-        info = self.get_info()            
-        self.initialize_profiles(top, info)
-        return
-
         # Track types to avoid creating duplicates
         self.node_types = set()
         self.data_types = set()
@@ -118,26 +108,29 @@ class Swagger2(swagger.Swagger):
         # Track definitions from which to create data types
         self.definitions = set()
         
-        # Process the Swagger object
-        self.process_host()
-        self.process_basePath()
-        self.process_schemes()
-        self.process_consumes()
-        self.process_produces()
+        # Get the names of the profiles that need to be created and
+        # their dependencies on other profiles
+        self.get_profile_names()
+
+        # Create the directories within which each profile will be
+        # created.
+        self.initialize_profiles(top, self.get_info())
+
+        # Extract node types from 'path' objects
         self.process_paths()
+
+        # Create data types based on 'definitions'
         self.process_definitions()
+
+        """
+        # Are any of these needed?
         self.process_parameters()
         self.process_responses()
         self.process_securityDefinitions()
         self.process_security()
         self.process_tags()
         self.process_externalDocs()
-
-
-    def initialize_profiles(self, top, info):
-        for name, profile in self.profiles.items():
-            profile.initialize(top, info)
-        
+        """
 
     def get_profile_names(self):
         """Scan the 'definitions' section of the Swagger object and parse out
@@ -159,10 +152,10 @@ class Swagger2(swagger.Swagger):
 
         # Process each schema definition
         for schema_name, schema in definitions.items():
-            self.process_schema(schema_name, schema)
+            self.get_profile_names_from_schema(schema_name, schema)
 
 
-    def process_schema(self, schema_name, schema):
+    def get_profile_names_from_schema(self, schema_name, schema):
         # Extract the group name from the schema name. This group name
         # will be used as the profile name.
         group, version, kind, prefix = parse_schema_name(schema_name)
@@ -210,6 +203,11 @@ class Swagger2(swagger.Swagger):
                     pass
 
 
+    def initialize_profiles(self, top, info):
+        for name, profile in self.profiles.items():
+            profile.initialize(top, info)
+        
+
     def get_info(self):
         """Process the (required) Info Object. This object provides metadata
         about the API. The metadata can be used by the clients if
@@ -234,29 +232,7 @@ class Swagger2(swagger.Swagger):
           version)
 
         """
-        try:
-            return self.data['info']
-        except KeyError:
-            logger.error("No Info Object")
-            exit(8)
-
-    def emit_metadata(self, indent, data):
-        self.out.write(
-            "%smetadata:\n"
-            % indent
-        )
-        indent = indent + '  '
-        self.emit_key_value_data(indent, data)
-
-    def emit_key_value_data(self, indent, data):
-        for key, value in data.items():
-            if isinstance(value, str):
-                self.out.write("%s%s: %s\n" %
-                               (indent, key, value))
-            else:
-                self.out.write("%s%s:\n" %
-                               (indent, key))
-                self.emit_key_value_data(indent+"  ", value)
+        return self.data['info']
 
 
     def process_host(self):
@@ -344,13 +320,11 @@ class Swagger2(swagger.Swagger):
             logger.error("No Paths Object")
             return
 
-        self.out.write("node_types:\n\n")
-        indent = "  "
         for name, value in paths.items():
-            self.process_path_object(indent, name, value)
+            self.process_path_object(name, value)
 
             
-    def process_path_object(self, indent, name, value):
+    def process_path_object(self, name, value):
         """A Path Object in Swagger 2 has the following:
 
         $ref(string): Allows for an external definition of this path
@@ -398,12 +372,12 @@ class Swagger2(swagger.Swagger):
             parameters = list()
         logger.debug("'%s' parameters:", name)
         for parameter in parameters:
-            self.process_parameter_object(indent, name, parameter)
+            self.process_parameter_object(name, parameter)
             
-        self.process_operation_object(indent, name, post)
+        self.process_operation_object(name, post)
         
             
-    def process_operation_object(self, indent, name, value):
+    def process_operation_object(self, name, value):
         """An Operation Object in Swagger 2 has the following:
 
         tags([string]): A list of tags for API documentation
@@ -478,10 +452,10 @@ class Swagger2(swagger.Swagger):
             parameters = list()
         logger.debug("'%s' POST parameters:", name)
         for parameter in parameters:
-            self.process_parameter_object(indent, name, parameter)
+            self.process_parameter_object(name, parameter)
 
         
-    def process_parameter_object(self, indent, name, value):
+    def process_parameter_object(self, name, value):
         """An Operation Object in Swagger 2 has the following:
 
         name(string): Required. The name of the parameter. Parameter
@@ -535,10 +509,10 @@ class Swagger2(swagger.Swagger):
             return
         
         # Create the node type for the referenced schema
-        self.create_node_type_from_schema(indent, schema_ref, node_type_schema)
+        self.create_node_type_from_schema(schema_ref, node_type_schema)
         
 
-    def create_node_type_from_schema(self, indent, name, schema):
+    def create_node_type_from_schema(self, name, schema):
         
         # Avoid duplicates
         if name in self.node_types:
@@ -562,41 +536,35 @@ class Swagger2(swagger.Swagger):
         # this schema
         self.plan_data_types_for_properties(schema)
 
-        # For k8s
-        # resources, we get the name of the resource from the
+        """
+        # For k8s resources, we get the name of the resource from the
         # 'x-kubernetes-group-version-kind' attribute. Note that the
         # value of 'x-kubernetes-group-version-kind' is a list. Not
         # sure why.
         try:
             group_version_kind = schema['x-kubernetes-group-version-kind'][0]
+            profile_name = group_version_kind['group']
             kind = group_version_kind['kind']
         except KeyError:
             logger.debug("%s: no group version kind", name)
             return
-
+        """
+        # Parse the schema name
+        group, version, kind, prefix = parse_schema_name(name)
+        
         # For now, we only handle v1
         try:
-            version = group_version_kind['version']
             if not version == 'v1':
-                logger.info("Ignoring %s version of %s", version, kind)
+                logger.debug("Ignoring %s version of %s", version, kind)
                 return
         except KeyError:
             logger.error("VERSION")
             return
-        
-        # Write 'name', 'description', and 'derived_from'.
-        self.out.write("%s%s:\n" % (indent, kind))
-        indent = indent + '  '
-        try:
-            description = schema['description']
-            self.emit_description(indent, description)
-        except KeyError:
-            pass
-        self.out.write("%sderived_from: tosca.nodes.Root\n" % indent)
-        
-        # Emit the node type
-        self.process_schema_object(indent, kind, schema)
 
+        # Get the profile for this schema
+        profile = self.profiles[group]
+        profile.emit_node_type(kind, schema)
+        
 
     def plan_data_types_for_properties(self, schema):
         """Plan the creation of a data type for schemas referenced in this
@@ -626,8 +594,31 @@ class Swagger2(swagger.Swagger):
                     pass
 
 
+    def process_definitions(self):
+        """Process the Definitions Object which holds data types produced and
+        consumed by operations.
 
-    def create_data_type_from_schema(self, indent, schema_name, schema):
+        """
+        # Make sure this swagger file has definitions
+        try:
+            definitions = self.data['definitions']
+            logger.debug("Processing Definitions")
+        except KeyError:
+            logger.debug("No Definitions")
+            return
+
+        for definition in self.definitions:
+            try:
+                value = definitions[definition]
+            except KeyError:
+                logger.error("Definition %s not found", definition)
+                continue
+            self.create_data_type_from_schema(definition, value)
+            if definition in self.node_types:
+                logger.info("%s is also node type", key)
+
+
+    def create_data_type_from_schema(self, schema_name, schema):
         """Create a TOSCA data type from a JSON Schema"""
 
         # Make sure this schema doesn't just reference another schema
@@ -646,7 +637,7 @@ class Swagger2(swagger.Swagger):
         
         # Make sure we define data types for any properties defined in
         # this schema
-        self.create_data_types_for_properties(indent, schema)
+        self.create_data_types_for_properties(schema)
 
         # Parse group, version, and kind from the schema name
         group, version, kind, prefix = parse_schema_name(schema_name)
@@ -655,108 +646,12 @@ class Swagger2(swagger.Swagger):
         if version != "v1":
             return
         
-        # Write kind and description
-        self.out.write("%s%s:\n" % (indent, kind))
-        indent = indent + '  '
-        try:
-            description = schema['description']
-            self.emit_description(indent, description)
-        except KeyError:
-            pass
-
-        # Remaining definitions depend on the schema type
-        try:
-            schema_type = schema['type']
-            if schema_type == 'object':
-                self.create_data_type_from_object(indent, kind, schema)
-            elif schema_type == "string":
-                self.create_data_type_from_string(indent, kind, schema)
-            elif schema_type == "array":
-                self.create_data_type_from_array(indent, kind, schema)
-            elif schema_type == "integer":
-                self.create_data_type_from_integer(indent, kind, schema)
-            elif schema_type == "number":
-                self.create_data_type_from_number(indent, kind, schema)
-            elif schema_type == "boolean":
-                self.create_data_type_from_boolean(indent, kind, schema)
-            elif schema_type == "null":
-                self.create_data_type_from_null(indent, kind, schema)
-            else:
-                logger.error("%s: unknown type '%s'", kind, schema_type)
-                return
-        except KeyError:
-            # No type specified. Could be any type
-            self.create_data_type_from_any(indent, kind, schema)
+        # Get the profile for this schema
+        profile = self.profiles[group]
+        profile.emit_data_type(kind, schema)
 
 
-    def create_data_type_from_object(self, indent, name, schema):
-        """Create a TOSCA data type from a JSON Schema Object"""
-
-        # Don't need 'derived_from'. Just emit the property
-        # definitions
-        self.process_schema_object(indent, name, schema)
-
-
-    def create_data_type_from_string(self, indent, name, schema):
-        """Create a TOSCA data type from a JSON Schema String"""
-
-        # This type is derived from string
-        self.out.write("%sderived_from: string\n" % indent )
-
-        # To Be Completed
-        logger.info("%s: string not fully implemented", name)
-        
-    def create_data_type_from_array(self, indent, name, schema):
-        """Create a TOSCA data type from a JSON Schema array"""
-
-        # This type is derived from list
-        self.out.write("%sderived_from: list\n" % indent )
-
-        logger.info("%s: array not fully implemented", name)
-
-    def create_data_type_from_number(self, indent, name, schema):
-        """Create a TOSCA data type from a JSON Schema number"""
-
-        # This type is derived from float
-        self.out.write("%sderived_from: float\n" % indent )
-
-        logger.info("%s: number not implemented", name)
-
-    def create_data_type_from_integer(self, indent, name, schema):
-        """Create a TOSCA data type from a JSON Schema integer"""
-
-        # This type is derived from integer
-        self.out.write("%sderived_from: integer\n" % indent )
-
-        logger.info("%s: integer not implemented", name)
-
-    def create_data_type_from_boolean(self, indent, name, schema):
-        """Create a TOSCA data type from a JSON Schema boolean"""
-
-        # This type is derived from boolean
-        self.out.write("%sderived_from: boolean\n" % indent )
-
-        logger.info("%s: boolean not implemented", name)
-
-    def create_data_type_from_null(self, indent, name, schema):
-        """Create a TOSCA data type from a JSON Schema null"""
-
-        # This type is derived from null
-        self.out.write("%sderived_from: null\n" % indent )
-
-        logger.info("%s: null not implemented", name)
-
-    def create_data_type_from_any(self, indent, name, schema):
-        """Create a TOSCA data type from a JSON Schema any type"""
-
-        # This type is derived from any type. Given the lack of 'any'
-        # in TOSCA, we'll just use 'string'
-        self.out.write("%sderived_from: string\n" % indent )
-
-        logger.info("%s: any not implemented", name)
-
-
-    def create_data_types_for_properties(self, indent, schema):
+    def create_data_types_for_properties(self, schema):
         """Create data types for property schemas referenced in this schema
         """
         # Does this schema have property definitions?
@@ -771,7 +666,7 @@ class Swagger2(swagger.Swagger):
             try:
                 property_type = self.get_ref(property_schema['$ref'])
                 if not property_type in self.data_types:
-                    self.create_data_type_from_schema(indent, property_type,
+                    self.create_data_type_from_schema(property_type,
                                                       self.data['definitions'][property_type])
                 else:
                     logger.debug("Duplicate %s", property_type)
@@ -782,244 +677,12 @@ class Swagger2(swagger.Swagger):
                     items = property_schema['items']
                     property_type = self.get_ref(items['$ref'])
                     if not property_type in self.data_types:
-                        self.create_data_type_from_schema(indent, property_type,
+                        self.create_data_type_from_schema(property_type,
                                                           self.data['definitions'][property_type])
                     else:
                         logger.debug("Duplicate %s", property_type)
                 except KeyError:
                     pass
-
-
-    def process_schema_object(self, indent, name, value):
-        """A Schema Object in Swagger 2 has the following:
-
-        $ref(URI Reference): Resolved against the current URI base, it
-          identifies the URI of a schema to use.  All other properties
-          in a "$ref" object MUST be ignored.
-
-        title(string): Title of this schema.
-
-        description(string--GFM syntax can be used for rich text
-          representation): Provides explanation about the purpose of
-          the instance described by this schema.
-
-        default('type'). Supplies a default JSON value associated with
-          this schema.  (Unlike with regular JSON Schema, the value
-          must conform to the defined type for the Schema Object)
-
-        Validation Keywords for All Types
-        ---------------------------------
-          type(string): values must be one of the six primitive types
-            ("null", "boolean", "object", "array", "number", or
-            "string"), or "integer" which matches any number with a
-            zero fractional part.
-
-          format(string): Allows schema authors to convey semantic
-            information for the values of the given 'type'
-
-          enum(array): An instance validates successfully against this
-            keyword if its value is equal to one of the elements in
-            this keyword's array value.
-
-        Validation Keywords for Numeric Instances (number and integer)
-        --------------------------------------------------------------
-
-          multipleOf(number > 0): A numeric instance is valid only if
-            division by this keyword's value results in an integer.
-
-          maximum(number): the instance must be less than or exactly
-            equal to "maximum".
-
-          exclusiveMaximum(number): the instance must have a value
-            strictly less than (not equal to) "exclusiveMaximum".
-
-          minimum (number): the instance must be greater than or
-            exactly equal to "maximum".
-
-          exclusiveMinimum(number): the instance must have a value
-            strictly greater than (not equal to) "exclusiveMinimum".
-
-        Validation Keywords for Strings
-        -------------------------------
-
-          maxLength(number >= 0): string length must be less than, or
-            equal to, the value of this keyword.
-
-          minLength(number >= 0): string length must be greater than,
-            or equal to, the value of this keyword.
-
-          pattern(string): the regular expression must match the
-            instance successfully.
-
-        Validation Keywords for Arrays
-        ------------------------------
-
-          maxItems(number >= 0): the array size must be less than, or
-            equal to, the value of this keyword.
-
-          minItems(number >= 0): the array size must be greater than,
-            or equal to, the value of this keyword.
-
-          uniqueItems(boolean): If true, the instance validates
-            successfully if all of its elements are unique.
-
-        Validation Keywords for Objects
-        ------------------------------
-
-          maxProperties(number >= 0): the number of object properties
-            is less than, or equal to, the value of this keyword.
-
-          minProperties(number >= 0): the number of object properties
-            is greater than, or equal to, the value of this keyword.
-
-          required(string[]): a property value must be defined for
-            every property listed in the array
-
-        Keywords for Applying Subschemas In Place
-        -----------------------------------------
-
-          allOf(schema[]): An instance validates successfully against
-            this keyword if it validates successfully against all
-            schemas defined by this keyword's value.
-
-        Keywords for Applying Subschemas to Child Instances
-        -------------------------------------------------
-
-          Keywords for Applying Subschemas to Arrays
-          ------------------------------------------
-
-            items(schema or schema[]): If "items" is a schema,
-              validation succeeds if all elements in the array
-              successfully validate against that schema.  If "items"
-              is an array of schemas, validation succeeds if each
-              element of the instance validates against the schema at
-              the same position, if any.
-
-          Keywords for Applying Subschemas to Objects
-          -------------------------------------------
-
-            properties(dict of schema): Each value of this object must
-              be a valid JSON Schema.
-
-            additionalProperties(schema): schema for child values of
-              instance names that do not appear in the annotation
-              results of "properties"
-
-        discriminator(string): Adds support for polymorphism. The
-          discriminator is the schema property name that is used to
-          differentiate between other schema that inherit this
-          schema. The property name used MUST be defined at this
-          schema and it MUST be in the required property list. When
-          used, the value MUST be the name of this schema or any
-          schema that inherits it.
-
-        readOnly(boolean): Relevant only for Schema "properties"
-          definitions. Declares the property as "read only". This
-          means that it MAY be sent as part of a response but MUST NOT
-          be sent as part of the request. Properties marked as
-          readOnly being true SHOULD NOT be in the required list of
-          the defined schema. Default value is false.
-
-        xml(XML Object): This MAY be used only on properties
-          schemas. It has no effect on root schemas. Adds Additional
-          metadata to describe the XML representation format of this
-          property.
-
-        externalDocs(External Documentation Object): Additional
-          external documentation for this schema.
-
-        example(any): A free-form property to include an example of an
-          instance for this schema
-        """
-
-        # Emit 'x-kubernetes-group-kind' as metadata
-        metadata = dict()
-        try:
-            # x-kubernetes-group-version-kind is a list for some reason
-            metadata['x-kubernetes-group-version-kind'] = value['x-kubernetes-group-version-kind'][0]
-            self.emit_metadata(indent, metadata)
-        except KeyError:
-            pass
-
-        # Add property definitions
-        try:
-            properties = value['properties']
-            try:
-                required = value['required']
-            except KeyError:
-                required = list()
-            self.add_properties(indent, properties, required)
-        except KeyError:
-            # No properties
-            pass
-
-        self.out.write("\n")
-
-
-    def add_properties(self, indent, properties, required):
-        self.out.write(
-            "%sproperties:\n"
-            % indent
-        )
-        indent = indent + '  '
-        for property_name, property_schema in properties.items():
-            self.add_property(indent, property_name, property_schema, required)
-            
-    def add_property(self, indent, property_name, value, required):
-        self.out.write(
-            "%s%s:\n"
-            % (indent, property_name)
-        )
-        indent = indent + '  '
-        # Write property type
-        try:
-            type_name = self.get_type(value['type'])
-        except KeyError:
-            try:
-                # No type specified. Use $ref instead
-                schema_name = self.get_ref(value['$ref'])
-                group, version, kind, prefix = parse_schema_name(schema_name)
-                type_name = kind
-            except KeyError:
-                logger.error("%s: no type", property_name)
-                return
-        self.out.write(
-            "%stype: %s\n"
-            % (indent, type_name)
-        )
-        # Write entry schema
-        try:
-            entry_schema = self.get_entry_schema(value['items'])
-            group, version, kind, prefix = parse_schema_name(entry_schema)
-            self.out.write(
-                "%sentry_schema: %s\n"
-                % (indent, kind)
-            )
-        except KeyError:
-            pass
-        try:
-            description = value['description']
-            self.emit_description(indent, description)
-        except KeyError:
-            pass
-        # Everything else is metadata
-        for field in ['x-kubernetes-list-map-keys', 'format', 'x-kubernetes-list-type', 'x-kubernetes-patch-strategy', 'x-kubernetes-patch-merge-key']:
-            try:
-                meta = value[field]
-#                self.add_meta_data(data, field, meta)
-            except KeyError:
-                pass
-
-
-    def get_type(self, type):
-        if type == 'array':
-            return 'list'
-        elif type == 'object':
-            return 'tosca.nodes.Root'
-        elif type == 'number':
-            return 'float'
-        else:
-            return type
 
 
     def get_ref(self, ref):
@@ -1041,19 +704,6 @@ class Swagger2(swagger.Swagger):
             return ref
 
         
-    def get_entry_schema(self, value):
-        try:
-            return self.get_type(value['type'])
-        except KeyError:
-            pass
-        try:
-            return self.get_ref(value['$ref'])
-        except KeyError:
-            pass
-        logger.error("%s: no entry schema found", str(value))
-        return "not found"
-
-
     def process_parameters(self):
         """Process the Parameters Definitions Object which holds parameters
         that can be used across operations. This property does not
@@ -1141,47 +791,6 @@ class Swagger2(swagger.Swagger):
         except KeyError:
             logger.debug("No ExternalDocs")
             return
-
-
-    def emit_description(self, indent, description):
-
-        # Emit description key
-        self.out.write(
-            "%sdescription: "
-            % (indent)
-        )
-        # Emit text. Split into multiple lines if necessary
-        lines = wrap_text(description)
-        self.emit_text_string(indent, lines)
-
-
-    def emit_text_string(self, indent, lines):
-        """Write a text value. We use YAML folded style if the text consists
-        of multiple lines or if it includes a colon character (or some
-        other character that would violate YAML syntax)
-        """
-        if len(lines) > 1 or (':' in lines[0]) or ('\'' in lines[0]) or ('\'' in lines[0]) or ('`' in lines[0]):
-            # Emit folding character
-            self.out.write(">-\n")
-            # Emit individual lines. Make sure the first line is indented
-            # correctly.
-            first = True
-            for line in lines:
-                if first:
-                    self.out.write(
-                        "%s%s\n"
-                        % (indent + '  ', line.lstrip())
-                    )
-                    first = False
-                else:
-                    self.out.write(
-                        "%s%s\n"
-                        % (indent + '  ', line.lstrip())
-                    )
-        else:
-            self.out.write("%s\n"
-                     % lines[0]
-            )
 
 
 def wrap_text(text_string):
