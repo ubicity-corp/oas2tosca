@@ -11,6 +11,10 @@ __status__ = "Prototype"
 import logging
 logger = logging.getLogger(__name__)
 
+# Directory support
+import os
+import os.path
+
 
 class Profile(object):
 
@@ -40,3 +44,23 @@ class Profile(object):
                              self.dependencies[dependency_profile])
         except KeyError:
             self.dependencies[dependency_profile] = dependency_prefix
+
+
+    def initialize(self, top):
+        """Initialize a skeleton structure for this profile
+        """
+        
+        # Create a path to the directory for this profile
+        path = self.name.split('.')
+        self.profile_dir = os.path.join(top, *path)
+        try:
+            logger.info("%s: create directory %s", self.name, self.profile_dir)
+            os.makedirs(self.profile_dir, exist_ok=True)
+        except Exception as e:
+            logger.error("%s: %s", self.profile_dir, str(e))
+            return
+
+        # Open a profile.yaml file
+        self.profile_yaml = os.path.join(self.profile_dir, 'profile.yaml')
+        fd = open(self.profile_yaml, "w")
+            

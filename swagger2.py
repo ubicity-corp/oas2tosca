@@ -11,10 +11,6 @@ __status__ = "Prototype"
 import logging
 logger = logging.getLogger(__name__)
 
-# Directory support
-import os
-import os.path
-
 # System support
 import swagger
 
@@ -139,21 +135,8 @@ class Swagger2(swagger.Swagger):
 
 
     def create_profile_directories(self, top):
-        for profile in self.profiles.keys():
-
-            # Create a path to the profile directory
-            path = profile.split('.')
-            profile_dir = os.path.join(top, *path)
-            try:
-                logger.info("Create directory %s", profile_dir)
-                os.makedirs(profile_dir, exist_ok=True)
-            except Exception as e:
-                logger.error("%s: %s", profile_dir, str(e))
-                pass
-
-            # Open a profile.yaml file
-            profile_file = os.path.join(profile_dir, 'profile.yaml')
-            fd = open(profile_file, "w")
+        for name, profile in self.profiles.items():
+            profile.initialize(top)
         
 
     def get_profile_names(self):
