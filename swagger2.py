@@ -122,6 +122,8 @@ class Swagger2(swagger.Swagger):
         # Create data types based on 'definitions'
         self.process_definitions()
 
+        self.finalize_profiles()
+
         """
         # Are any of these needed?
         self.process_parameters()
@@ -206,6 +208,10 @@ class Swagger2(swagger.Swagger):
     def initialize_profiles(self, top, info):
         for name, profile in self.profiles.items():
             profile.initialize(top, info)
+        
+    def finalize_profiles(self):
+        for name, profile in self.profiles.items():
+            profile.finalize()
         
 
     def get_info(self):
@@ -549,7 +555,7 @@ class Swagger2(swagger.Swagger):
         
         # For now, we only handle v1
         try:
-            if not version == 'v1':
+            if version and version != 'v1':
                 logger.debug("Ignoring %s version of %s", version, kind)
                 return
         except KeyError:
@@ -642,13 +648,17 @@ class Swagger2(swagger.Swagger):
         
         # Make sure we define data types for any properties defined in
         # this schema
-        self.create_data_types_for_properties(schema)
+        try:
+            self.create_data_types_for_properties(schema)
+        except Exception as e:
+            logger.error("%s: %s", schema_name, str(e))
 
         # Parse group, version, and kind from the schema name
         group, version, kind, prefix = parse_schema_name(schema_name)
 
         # We only handle v1 for now
-        if version != "v1":
+        if version and version != "v1":
+            logger.debug("%s: unhandled version", schema_name)
             return
         
         # Get the profile for this schema

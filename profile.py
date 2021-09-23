@@ -64,6 +64,9 @@ class Profile(object):
         self.prepare_yaml_file(swagger_info)
 
 
+    def finalize(self):
+        self.out.close()
+
     def create_profile_directory(self, top):
         # Create a path to the directory for this profile
         path = self.name.split('.')
@@ -85,7 +88,6 @@ class Profile(object):
         out.write("Created-By: swagger2tosca\n")
         out.write("Entry-Definitions: profile.yaml\n")
         out.close()
-
 
 
     def prepare_yaml_file(self, swagger_info):
