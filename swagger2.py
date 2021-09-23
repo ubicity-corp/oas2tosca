@@ -18,6 +18,9 @@ import os.path
 # System support
 import swagger
 
+# Profiles
+import profile as p
+
 # Text formatting
 import textwrap
 
@@ -191,10 +194,10 @@ class Swagger2(swagger.Swagger):
 
         # Add dependencies for this profile
         try:
-            dependencies = self.profiles[group]
+            profile = self.profiles[group]
         except KeyError:
-            dependencies = set()
-            self.profiles[group] = dependencies
+            profile = p.Profile(group, version, prefix)
+            self.profiles[group] = profile
 
         # Schemas are referenced by property definitions
         try:
@@ -210,7 +213,7 @@ class Swagger2(swagger.Swagger):
                 property_type = self.get_ref(property_value['$ref'])
                 property_group, version, kind, prefix = parse_schema_name(property_type)
                 if group != property_group:
-                    dependencies.add(property_group)
+                    profile.add_dependency(property_group, prefix)
             except KeyError:
                 # Property schema does not contain a $ref. Items
                 # perhaps?
@@ -219,7 +222,7 @@ class Swagger2(swagger.Swagger):
                     property_type = self.get_ref(items['$ref'])
                     property_group, version, kind, prefix = parse_schema_name(property_type)
                     if group != property_group:
-                        dependencies.add(property_group)
+                        profile.add_dependency(property_group, prefix)
                 except KeyError:
                     pass
 
