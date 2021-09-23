@@ -521,7 +521,10 @@ class Profile(object):
                 # No type specified. Use $ref instead
                 schema_name = self.get_ref(value['$ref'])
                 group, version, kind, prefix = parse_schema_name(schema_name)
-                type_name = kind
+                if prefix and prefix != self.prefix:
+                    type_name = prefix + ':' + kind
+                else:
+                    type_name = kind
             except KeyError:
                 logger.error("%s: no type", property_name)
                 return
@@ -533,9 +536,13 @@ class Profile(object):
         try:
             entry_schema = self.get_entry_schema(value['items'])
             group, version, kind, prefix = parse_schema_name(entry_schema)
+            if prefix and prefix != self.prefix:
+                type_name = prefix + ':' + kind
+            else:
+                type_name = kind
             self.out.write(
                 "%sentry_schema: %s\n"
-                % (indent, kind)
+                % (indent, type_name)
             )
         except KeyError:
             pass
