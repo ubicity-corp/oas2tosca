@@ -57,6 +57,9 @@ class Profile(object):
         # Create profile directory if it doesn't exist.
         self.create_profile_directory(top)
 
+        # Create TOSCA.meta file
+        self.create_tosca_meta()
+
         # Prepare 'profile.yaml' file
         self.prepare_yaml_file(swagger_info)
 
@@ -71,6 +74,18 @@ class Profile(object):
         except Exception as e:
             logger.error("%s: %s", self.directory, str(e))
             return
+
+
+    def create_tosca_meta(self):
+        # Open a TOSCA meta file
+        tosca_meta = os.path.join(self.directory, 'TOSCA.meta')
+        out = open(tosca_meta, "w")
+        out.write("TOSCA-Meta-File-Version: 1.0\n")
+        out.write("CSAR-Version: 1.1\n")
+        out.write("Created-By: swagger2tosca\n")
+        out.write("Entry-Definitions: profile.yaml\n")
+        out.close()
+
 
 
     def prepare_yaml_file(self, swagger_info):

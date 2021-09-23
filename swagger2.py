@@ -532,23 +532,18 @@ class Swagger2(swagger.Swagger):
                              name)
                 return
 
+        # k8s resources include a 'x-kubernetes-group-version-kind'
+        # attribute. Note that the value of
+        # 'x-kubernetes-group-version-kind' is a list. Not sure why.
+        try:
+            group_version_kind_list = schema['x-kubernetes-group-version-kind']
+        except KeyError:
+            logger.error("%s: creating node type without group version kind", name)
+
         # Make sure we plan to define data types for any properties in
         # this schema
         self.plan_data_types_for_properties(schema)
 
-        """
-        # For k8s resources, we get the name of the resource from the
-        # 'x-kubernetes-group-version-kind' attribute. Note that the
-        # value of 'x-kubernetes-group-version-kind' is a list. Not
-        # sure why.
-        try:
-            group_version_kind = schema['x-kubernetes-group-version-kind'][0]
-            profile_name = group_version_kind['group']
-            kind = group_version_kind['kind']
-        except KeyError:
-            logger.debug("%s: no group version kind", name)
-            return
-        """
         # Parse the schema name
         group, version, kind, prefix = parse_schema_name(name)
         
@@ -634,6 +629,16 @@ class Swagger2(swagger.Swagger):
             logger.debug("%s: duplicate", schema_name)
             return
         self.data_types.add(schema_name)
+        
+        # k8s schemas for properties must not include a
+        # 'x-kubernetes-group-version-kind' attribute. Note that the
+        # value of 'x-kubernetes-group-version-kind' is a list. Not
+        # sure why.
+        try:
+            group_version_kind_list = schema['x-kubernetes-group-version-kind']
+            logger.error("%s: creating data type with group version kind", schema_name)
+        except KeyError:
+            pass
         
         # Make sure we define data types for any properties defined in
         # this schema
