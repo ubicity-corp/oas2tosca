@@ -154,7 +154,7 @@ class Profile(object):
         self.out.write("imports:\n")
         for name, prefix in self.dependencies.items():
             self.out.write("  - file: %s\n" % name)
-            self.out.write("    prefix: %s\n" % prefix)
+            self.out.write("    namespace_prefix: %s\n" % prefix)
         self.out.write("\n")
 
 
@@ -611,7 +611,7 @@ class Profile(object):
         if type == 'array':
             return 'list'
         elif type == 'object':
-            return 'tosca.nodes.Root'
+            return 'tosca.datatypes.Root'
         elif type == 'number':
             return 'float'
         else:
