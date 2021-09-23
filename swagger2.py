@@ -107,7 +107,8 @@ class Swagger2(swagger.Swagger):
 
         # Create the directories within which each profile will be
         # created.
-        self.create_profile_directories(top)
+        info = self.get_info()            
+        self.initialize_profiles(top, info)
         return
 
         # Track types to avoid creating duplicates
@@ -118,7 +119,6 @@ class Swagger2(swagger.Swagger):
         self.definitions = set()
         
         # Process the Swagger object
-        self.process_info()            
         self.process_host()
         self.process_basePath()
         self.process_schemes()
@@ -134,9 +134,9 @@ class Swagger2(swagger.Swagger):
         self.process_externalDocs()
 
 
-    def create_profile_directories(self, top):
+    def initialize_profiles(self, top, info):
         for name, profile in self.profiles.items():
-            profile.initialize(top)
+            profile.initialize(top, info)
         
 
     def get_profile_names(self):
@@ -210,7 +210,7 @@ class Swagger2(swagger.Swagger):
                     pass
 
 
-    def process_info(self):
+    def get_info(self):
         """Process the (required) Info Object. This object provides metadata
         about the API. The metadata can be used by the clients if
         needed. A swagger 2 Info Object has the following properties:
@@ -235,15 +235,11 @@ class Swagger2(swagger.Swagger):
 
         """
         try:
-            info = self.data['info']
+            return self.data['info']
         except KeyError:
             logger.error("No Info Object")
-            return
+            exit(8)
 
-        indent = ""
-        self.emit_metadata(indent, info)
-        self.out.write("\n")
-        
     def emit_metadata(self, indent, data):
         self.out.write(
             "%smetadata:\n"
