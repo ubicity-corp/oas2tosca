@@ -170,7 +170,7 @@ class Profile(object):
 
     def emit_key_value_data(self, indent, data):
         for key, value in data.items():
-            if isinstance(value, str):
+            if isinstance(value, (str, list)):
                 self.out.write("%s%s: %s\n" %
                                (indent, key, value))
             else:
@@ -500,7 +500,8 @@ class Profile(object):
         except KeyError:
             pass
 
-        # Add property definitions
+        # Add property definitions. Pass the list of required
+        # properties.
         try:
             properties = value['properties']
             try:
@@ -516,6 +517,8 @@ class Profile(object):
 
 
     def add_properties(self, indent, properties, required):
+        """Write out the property definitions for this type"""
+        
         self.out.write(
             "%sproperties:\n"
             % indent
@@ -524,34 +527,64 @@ class Profile(object):
         for property_name, property_schema in properties.items():
             self.add_property(indent, property_name, property_schema, required)
             
-    def add_property(self, indent, property_name, value, required):
+    def add_property(self, indent, property_name, schema, required):
+        """Add a property definition based on the provided schema"""
+
+        # Write out name and description
         self.out.write(
             "%s%s:\n"
             % (indent, property_name)
         )
         indent = indent + '  '
-        # Write property type
         try:
-            type_name = self.get_type(value['type'])
+            description = schema['description']
+            self.emit_description(indent, description)
         except KeyError:
-            try:
-                # No type specified. Use $ref instead
-                schema_name = self.get_ref(value['$ref'])
-                group, version, kind, prefix = parse_schema_name(schema_name)
-                if prefix and prefix != self.prefix:
-                    type_name = prefix + ':' + kind
-                else:
-                    type_name = kind
-            except KeyError:
-                logger.error("%s: no type", property_name)
+            pass
+
+        # Remaining property definitions depend on the property type
+        try:
+            property_type = schema['type']
+            if property_type == 'object':
+                self.add_property_from_object(indent, property_name, schema)
+            elif property_type == "string":
+                self.add_property_from_string(indent, property_name, schema)
+            elif property_type == "array":
+                self.add_property_from_array(indent, property_name, schema)
+            elif property_type == "integer":
+                self.add_property_from_integer(indent, property_name, schema)
+            elif property_type == "number":
+                self.add_property_from_number(indent, property_name, schema)
+            elif property_type == "boolean":
+                self.add_property_from_boolean(indent, property_name, schema)
+            elif property_type == "null":
+                self.add_property_from_null(indent, property_name, schema)
+            else:
+                logger.error("%s: unknown type '%s'", property_name, property_type)
                 return
-        self.out.write(
-            "%stype: %s\n"
-            % (indent, type_name)
-        )
+        except KeyError:
+            # No type specified. Do we have a 'ref'?
+            try:
+                schema_name = self.get_ref(schema['$ref'])
+                self.add_property_from_ref(indent, property_name, schema)
+            except KeyError:
+                # Not a ref either. Must be any type
+                self.add_property_from_any(indent, property_name, schema)
+
+    def add_property_from_object(self, indent, property_name, schema):
+        logger.info("property '%s' of type 'object' with schema %s", property_name, str(schema))
+        self.out.write("%stype: tosca.datatypes.Root\n" % indent )
+        
+    def add_property_from_string(self, indent, property_name, schema):
+        self.out.write("%stype: string\n" % indent )
+        
+    def add_property_from_array(self, indent, property_name, schema):
+        # Write type
+        self.out.write("%stype: list\n" % indent )
+
         # Write entry schema
         try:
-            entry_schema = self.get_entry_schema(value['items'])
+            entry_schema = self.get_entry_schema(schema['items'])
             group, version, kind, prefix = parse_schema_name(entry_schema)
             if prefix and prefix != self.prefix:
                 type_name = prefix + ':' + kind
@@ -563,20 +596,46 @@ class Profile(object):
             )
         except KeyError:
             pass
-        try:
-            description = value['description']
-            self.emit_description(indent, description)
-        except KeyError:
-            pass
-        # Everything else is metadata
-        for field in ['x-kubernetes-list-map-keys', 'format', 'x-kubernetes-list-type', 'x-kubernetes-patch-strategy', 'x-kubernetes-patch-merge-key']:
+
+        # Write list metadata
+        meta = dict()
+        for field in ['x-kubernetes-list-map-keys', 'x-kubernetes-list-type' ]:
             try:
-                meta = value[field]
-#                self.add_meta_data(data, field, meta)
+                meta[field] = schema[field]
             except KeyError:
                 pass
+        if meta: self.emit_metadata(indent, meta)
 
-
+    def add_property_from_integer(self, indent, property_name, schema):
+        self.out.write("%stype: integer\n" % indent )
+        
+    def add_property_from_number(self, indent, property_name, schema):
+        self.out.write("%stype: float\n" % indent )
+        
+    def add_property_from_boolean(self, indent, property_name, schema):
+        self.out.write("%stype: boolean\n" % indent )
+        
+    def add_property_from_null(self, indent, property_name, schema):
+        self.out.write("%stype: null\n" % indent )
+        
+    def add_property_from_ref(self, indent, property_name, schema):
+        schema_name = self.get_ref(schema['$ref'])
+        group, version, kind, prefix = parse_schema_name(schema_name)
+        if prefix and prefix != self.prefix:
+            type_name = prefix + ':' + kind
+        else:
+            type_name = kind
+        self.out.write(
+            "%stype: %s\n"
+            % (indent, type_name)
+        )
+        
+    def add_property_from_any(self, indent, kind, schema):
+        # This property can be ofany type. Given the lack of 'any' in
+        # TOSCA, we'll just use 'string'
+        self.out.write("%stype: string\n" % indent )
+        
+            
     def get_entry_schema(self, value):
         try:
             return self.get_type(value['type'])
