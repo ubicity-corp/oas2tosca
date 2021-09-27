@@ -328,8 +328,7 @@ class Profile(object):
         The following validation Keywords apply to all types:
         ----------------------------------------------------
           format(string): Allows schema authors to convey semantic
-            information for the values of the given 'type'. However,
-            swagger does not support 'format' for strings.
+            information for the values of the given 'type'.
 
           enum(array): An instance validates successfully against this
             keyword if its value is equal to one of the elements in
@@ -378,7 +377,7 @@ class Profile(object):
             if enum: self.emit_valid_values(indent, enum)
             if maxLength: self.emit_max_length(indent, maxLength)
             if minLength: self.emit_min_length(indent, minLength)
-            if enum: self.emit_pattern_values(indent, pattern)
+            if pattern: self.emit_pattern(indent, pattern)
 
 
     def process_keywords_for_array(self, indent, name, schema):
@@ -414,8 +413,81 @@ class Profile(object):
 
 
     def process_keywords_for_integer(self, indent, name, schema):
-        """Create a TOSCA data type from a JSON Schema integer"""
-        logger.info("%s: integer not implemented", name)
+        """Process JSON Schema keywords for strings. 
+
+        The following validation Keywords apply to all types:
+        ----------------------------------------------------
+          type(string): values must be one of the six primitive types
+            ("null", "boolean", "object", "array", "number", or
+            "string"), or "integer" which matches any number with a
+            zero fractional part.
+
+          format(string): Allows schema authors to convey semantic
+            information for the values of the given 'type'
+
+          enum(array): An instance validates successfully against this
+            keyword if its value is equal to one of the elements in
+            this keyword's array value.
+
+        Validation Keywords for Numeric Instances (number and integer)
+        --------------------------------------------------------------
+
+          multipleOf(number > 0): A numeric instance is valid only if
+            division by this keyword's value results in an integer.
+
+          maximum(number): the instance must be less than or exactly
+            equal to "maximum".
+
+          exclusiveMaximum(number): the instance must have a value
+            strictly less than (not equal to) "exclusiveMaximum".
+
+          minimum (number): the instance must be greater than or
+            exactly equal to "maximum".
+
+          exclusiveMinimum(number): the instance must have a value
+            strictly greater than (not equal to) "exclusiveMinimum".
+        """
+        # TOSCA does not support 'multipleOf' in integers
+        try:
+            multipleOf = schema['multipleOf']
+            logger.error("%s: multipleOf '%s' not supported in TOSCA", name, multipleOf)
+        except KeyError:
+            pass
+
+        # Turn remaining keywords into constraints
+        try:
+            fmt = schema['format']
+        except KeyError:
+            fmt = None
+        try:
+            enum = schema['enum']
+        except KeyError:
+            enum = None
+        try:
+            maximum = schema['maximum']
+        except KeyError:
+            maximum = None
+        try:
+            exclusive_maximum = schema['exclusiveMaximum']
+        except KeyError:
+            exclusive_maximum = None
+        try:
+            minimum = schema['minimum']
+        except KeyError:
+            minimum = None
+        try:
+            exclusive_minimum = schema['exclusiveMinimum']
+        except KeyError:
+            exclusive_minimum = None
+        if fmt or enum or maximum or minimum or exclusive_maximum or exclusive_minimum:
+            self.out.write("%sconstraints:\n" % (indent))
+            indent = indent + '  '
+            if fmt: self.emit_integer_format(indent, fmt)
+            if enum: self.emit_valid_values(indent, enum)
+            if maximum: self.emit_maximum(indent, maximum)
+            if minimum: self.emit_minimum(indent, minimum)
+            if exclusive_maximum: self.emit_exclusive_maximum(indent, exclusiveMaximum)
+            if exclusive_minimum: self.emit_exclusive_minimum(indent, exclusiveMinimum)
 
 
     def process_keywords_for_boolean(self, indent, name, schema):
@@ -804,15 +876,35 @@ class Profile(object):
         for value in enum:
             self.out.write("%s- %s" % (indent, value))
 
-
     def emit_max_length(self, indent, maxLength):
         self.out.write("%s- max_length: %s\n" % (indent, maxLength))
 
     def emit_min_length(indent, minLength):
         self.out.write("%s- min_length: %s\n" % (indent, minLength))
 
-    def emit_pattern_values(self, indent, pattern):
+    def emit_pattern(self, indent, pattern):
         self.out.write("%s- pattern: '%s'\n" % (indent, pattern))
+
+    def emit_integer_format(self, indent, fmt):
+        if fmt == 'int32':
+            self.out.write("%s- in_range: [-2147483648, 2147483647]\n" % (indent))
+        elif fmt == 'int64':
+            self.out.write("%s- in_range: [-9223372036854775808, 9223372036854775807]\n" % (indent))
+        else:
+            logger.error("Unsupported integer format '%s'", fmt)
+
+    def emit_maximum(self, indent, maximum):
+        self.out.write("%s- less_or_equal: %s\n" % (indent, maximum))
+
+    def emit_minimum(self, indent, minimum):
+        self.out.write("%s- greater_or_equal: %s\n" % (indent, minimum))
+
+    def emit_exclusive_maximum(self,indent, exclusiveMaximum):
+        self.out.write("%s- less_than: %s\n" % (indent, exclusiveMaximum))
+
+    def emit_exclusive_minimum(self, indent, exclusiveMinimum):
+        self.out.write("%s- greater_than: %s\n" % (indent, exclusiveMinimum))
+        
 
     def get_type(self, type):
         if type == 'array':
