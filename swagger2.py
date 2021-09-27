@@ -518,51 +518,46 @@ class Swagger2(swagger.Swagger):
         self.create_node_type_from_schema(schema_ref, node_type_schema)
         
 
-    def create_node_type_from_schema(self, name, schema):
+    def create_node_type_from_schema(self, schema_name, schema):
+        """Create a TOSCA node type from a JSON Schema"""
         
         # Avoid duplicates
-        if name in self.node_types:
-            logger.info("%s: duplicate", name)
+        if schema_name in self.node_types:
+            logger.info("%s: duplicate", schema_name)
             return
-        self.node_types.add(name)
+        self.node_types.add(schema_name)
         
-        # If this is intended to be a node type, the schema 'type'
-        # better be 'object'
+        # If this schema is intended to define a node type, the schema
+        # 'type' better be 'object'.
         try:
             if not schema['type'] == 'object':
-                logger.error("Trying to create node type '%s' with type '%s'",
-                             name, schema['type'])
+                logger.error("Node type '%s' with type '%s'", schema_name, schema['type'])
                 return
         except KeyError:
                 logger.error("Trying to create node type '%s' without a type",
-                             name)
+                             schema_name)
                 return
 
-        # k8s resources include a 'x-kubernetes-group-version-kind'
+        # Parse group, version, prefix, and kind from the schema name. 
+        group, version, kind, prefix = parse_schema_name(schema_name)
+        # For now, we only handle v1
+        if version and version != 'v1':
+            logger.debug("Ignoring %s version of %s", version, kind)
+            return
+
+        # k8s 'resources' include a 'x-kubernetes-group-version-kind'
         # attribute. Note that the value of
         # 'x-kubernetes-group-version-kind' is a list. Not sure why.
         try:
             group_version_kind_list = schema['x-kubernetes-group-version-kind']
         except KeyError:
-            logger.error("%s: creating node type without group version kind", name)
+            logger.error("%s: creating node type without group version kind", schema_name)
 
-        # Make sure we plan to define data types for any properties in
-        # this schema
+        # Make sure we plan to define data types for any properties
+        # defined in this schema
         self.plan_data_types_for_properties(schema)
 
-        # Parse the schema name
-        group, version, kind, prefix = parse_schema_name(name)
-        
-        # For now, we only handle v1
-        try:
-            if version and version != 'v1':
-                logger.debug("Ignoring %s version of %s", version, kind)
-                return
-        except KeyError:
-            logger.error("VERSION")
-            return
-
-        # Get the profile for this schema
+        # Create the node type in the profile for this schema
         profile = self.profiles[group]
         profile.emit_node_type(kind, schema)
         
@@ -622,21 +617,29 @@ class Swagger2(swagger.Swagger):
     def create_data_type_from_schema(self, schema_name, schema):
         """Create a TOSCA data type from a JSON Schema"""
 
-        # Make sure this schema doesn't just reference another schema
-        try:
-            ref = schema['$ref']
-            logger.error("%s references %s", schema_name, ref)
-            return
-        except KeyError:
-            pass
-
         # Avoid duplicates
         if schema_name in self.data_types:
             logger.debug("%s: duplicate", schema_name)
             return
         self.data_types.add(schema_name)
         
-        # k8s schemas for properties must not include a
+        # If this schema is intended to define a data type, this
+        # schema must not reference another schema.
+        try:
+            ref = schema['$ref']
+            logger.error("%s REFERENCES %s", schema_name, ref)
+            return
+        except KeyError:
+            pass
+
+        # Parse group, version, and kind from the schema name. 
+        group, version, kind, prefix = parse_schema_name(schema_name)
+        # We only handle v1 for now
+        if version and version != "v1":
+            logger.debug("Ignoring %s version of %s", version, kind)
+            return
+        
+        # k8s schemas for data types must not include a
         # 'x-kubernetes-group-version-kind' attribute. Note that the
         # value of 'x-kubernetes-group-version-kind' is a list. Not
         # sure why.
@@ -653,15 +656,7 @@ class Swagger2(swagger.Swagger):
         except Exception as e:
             logger.error("%s: %s", schema_name, str(e))
 
-        # Parse group, version, and kind from the schema name
-        group, version, kind, prefix = parse_schema_name(schema_name)
-
-        # We only handle v1 for now
-        if version and version != "v1":
-            logger.debug("%s: unhandled version", schema_name)
-            return
-        
-        # Get the profile for this schema
+        # Create the data type in the profile for this schema
         profile = self.profiles[group]
         profile.emit_data_type(kind, schema)
 

@@ -67,6 +67,7 @@ class Profile(object):
     def finalize(self):
         self.out.close()
 
+
     def create_profile_directory(self, top):
         # Create a path to the directory for this profile
         path = self.name.split('.')
@@ -168,24 +169,16 @@ class Profile(object):
         indent = indent + '  '
         self.emit_key_value_data(indent, data)
 
-    def emit_key_value_data(self, indent, data):
-        for key, value in data.items():
-            if isinstance(value, (str, list)):
-                self.out.write("%s%s: %s\n" %
-                               (indent, key, value))
-            else:
-                self.out.write("%s%s:\n" %
-                               (indent, key))
-                self.emit_key_value_data(indent+"  ", value)
-
 
     def emit_node_type(self, kind, schema):
+        """Emit a node type definition for a JSON Schema object"""
 
+        # Do we have to write the header first?
         if not self.already_has_node_types:
             self.out.write("node_types:\n\n")
             self.already_has_node_types = True
             
-        # Write 'name', 'description', and 'derived_from'.
+        # Write 'name' and 'description'
         indent = '  '
         self.out.write("%s%s:\n" % (indent, kind))
         indent = indent + '  '
@@ -194,9 +187,12 @@ class Profile(object):
             self.emit_description(indent, description)
         except KeyError:
             pass
+
+        # For now, we always derive node types from Root
         self.out.write("%sderived_from: tosca.nodes.Root\n" % indent)
-        
-        self.process_schema_object(indent, kind, schema)
+
+        # Process remaining keywords
+        self.process_keywords_for_object(indent, kind, schema)
 
 
     def emit_description(self, indent, description):
@@ -241,13 +237,14 @@ class Profile(object):
 
 
     def emit_data_type(self, kind, schema):
+        """Emit data type for a JSON Schema object"""
 
         # Do we have to write the header first?
         if not self.already_has_data_types:
             self.out.write("data_types:\n\n")
             self.already_has_data_types = True
             
-        # Write kind and description
+        # Write 'name' and 'description'
         indent = '  '
         self.out.write("%s%s:\n" % (indent, kind))
         indent = indent + '  '
@@ -261,96 +258,102 @@ class Profile(object):
         try:
             schema_type = schema['type']
             if schema_type == 'object':
-                self.create_data_type_from_object(indent, kind, schema)
+                # Don't need 'derived_from'.
+                self.process_keywords_for_object(indent, kind, schema)
             elif schema_type == "string":
-                self.create_data_type_from_string(indent, kind, schema)
+                # This type is derived from string
+                self.out.write("%sderived_from: string\n" % indent )
+                self.process_keywords_for_string(indent, kind, schema)
             elif schema_type == "array":
-                self.create_data_type_from_array(indent, kind, schema)
+                # This type is derived from list
+                self.out.write("%sderived_from: list\n" % indent )
+                self.process_keywords_for_array(indent, kind, schema)
             elif schema_type == "integer":
-                self.create_data_type_from_integer(indent, kind, schema)
+                # This type is derived from integer
+                self.out.write("%sderived_from: integer\n" % indent )
+                self.process_keywords_for_integer(indent, kind, schema)
             elif schema_type == "number":
-                self.create_data_type_from_number(indent, kind, schema)
+                # This type is derived from float
+                self.out.write("%sderived_from: float\n" % indent )
+                self.process_keywords_for_number(indent, kind, schema)
             elif schema_type == "boolean":
-                self.create_data_type_from_boolean(indent, kind, schema)
+                # This type is derived from boolean
+                self.out.write("%sderived_from: boolean\n" % indent )
+                self.process_keywords_for_boolean(indent, kind, schema)
             elif schema_type == "null":
-                self.create_data_type_from_null(indent, kind, schema)
+                # This type is derived from null
+                self.out.write("%sderived_from: null\n" % indent )
+                self.process_keywords_for_null(indent, kind, schema)
             else:
                 logger.error("%s: unknown type '%s'", kind, schema_type)
                 return
         except KeyError:
-            # No type specified. Could be any type
-            self.create_data_type_from_any(indent, kind, schema)
+            # No 'type', which means that this data type can have any
+            # type. Given the lack of 'any' in TOSCA, we'll just use
+            # 'string'
+            self.out.write("%sderived_from: string\n" % indent )
+            self.process_keywords_for_any(indent, kind, schema)
 
 
-    def create_data_type_from_object(self, indent, name, schema):
-        """Create a TOSCA data type from a JSON Schema Object"""
-
-        # Don't need 'derived_from'. Just emit the property
-        # definitions
-        self.process_schema_object(indent, name, schema)
-
-
-    def create_data_type_from_string(self, indent, name, schema):
+    def process_keywords_for_string(self, indent, name, schema):
         """Create a TOSCA data type from a JSON Schema String"""
-
-        # This type is derived from string
-        self.out.write("%sderived_from: string\n" % indent )
-
-        # To Be Completed
         logger.info("%s: string not fully implemented", name)
         
-    def create_data_type_from_array(self, indent, name, schema):
-        """Create a TOSCA data type from a JSON Schema array"""
 
-        # This type is derived from list
-        self.out.write("%sderived_from: list\n" % indent )
+    def process_keywords_for_array(self, indent, name, schema):
+        # Write entry schema
+        try:
+            entry_schema = self.get_entry_schema(schema['items'])
+            group, version, kind, prefix = parse_schema_name(entry_schema)
+            if prefix and prefix != self.prefix:
+                type_name = prefix + ':' + kind
+            else:
+                type_name = kind
+            self.out.write(
+                "%sentry_schema: %s\n"
+                % (indent, type_name)
+            )
+        except KeyError:
+            pass
 
+        # Write list metadata
+        meta = dict()
+        for field in ['x-kubernetes-list-map-keys', 'x-kubernetes-list-type' ]:
+            try:
+                meta[field] = schema[field]
+            except KeyError:
+                pass
+        if meta: self.emit_metadata(indent, meta)
         logger.info("%s: array not fully implemented", name)
 
-    def create_data_type_from_number(self, indent, name, schema):
+
+    def process_keywords_for_number(self, indent, name, schema):
         """Create a TOSCA data type from a JSON Schema number"""
-
-        # This type is derived from float
-        self.out.write("%sderived_from: float\n" % indent )
-
         logger.info("%s: number not implemented", name)
 
-    def create_data_type_from_integer(self, indent, name, schema):
+
+    def process_keywords_for_integer(self, indent, name, schema):
         """Create a TOSCA data type from a JSON Schema integer"""
-
-        # This type is derived from integer
-        self.out.write("%sderived_from: integer\n" % indent )
-
         logger.info("%s: integer not implemented", name)
 
-    def create_data_type_from_boolean(self, indent, name, schema):
+
+    def process_keywords_for_boolean(self, indent, name, schema):
         """Create a TOSCA data type from a JSON Schema boolean"""
-
-        # This type is derived from boolean
-        self.out.write("%sderived_from: boolean\n" % indent )
-
         logger.info("%s: boolean not implemented", name)
 
-    def create_data_type_from_null(self, indent, name, schema):
+
+    def process_keywords_for_null(self, indent, name, schema):
         """Create a TOSCA data type from a JSON Schema null"""
-
-        # This type is derived from null
-        self.out.write("%sderived_from: null\n" % indent )
-
         logger.info("%s: null not implemented", name)
 
-    def create_data_type_from_any(self, indent, name, schema):
+
+    def process_keywords_for_any(self, indent, name, schema):
         """Create a TOSCA data type from a JSON Schema any type"""
-
-        # This type is derived from any type. Given the lack of 'any'
-        # in TOSCA, we'll just use 'string'
-        self.out.write("%sderived_from: string\n" % indent )
-
         logger.info("%s: any not implemented", name)
 
 
-    def process_schema_object(self, indent, name, value):
-        """A Schema Object in Swagger 2 has the following:
+    def process_keywords_for_object(self, indent, name, schema):
+        """A JSON Schema Object in Swagger has the following:
 
         $ref(URI Reference): Resolved against the current URI base, it
           identifies the URI of a schema to use.  All other properties
@@ -489,13 +492,14 @@ class Profile(object):
 
         example(any): A free-form property to include an example of an
           instance for this schema
+
         """
 
         # Emit 'x-kubernetes-group-kind' as metadata
         metadata = dict()
         try:
             # x-kubernetes-group-version-kind is a list for some reason
-            metadata['x-kubernetes-group-version-kind'] = value['x-kubernetes-group-version-kind'][0]
+            metadata['x-kubernetes-group-version-kind'] = schema['x-kubernetes-group-version-kind'][0]
             self.emit_metadata(indent, metadata)
         except KeyError:
             pass
@@ -503,9 +507,9 @@ class Profile(object):
         # Add property definitions. Pass the list of required
         # properties.
         try:
-            properties = value['properties']
+            properties = schema['properties']
             try:
-                required = value['required']
+                required = schema['required']
             except KeyError:
                 required = list()
             self.add_properties(indent, properties, required)
@@ -546,19 +550,35 @@ class Profile(object):
         try:
             property_type = schema['type']
             if property_type == 'object':
-                self.add_property_from_object(indent, property_name, schema)
+                # Not sure yet what to do here. For now, use
+                # 'tosca.datatypes.Root' as a "generic" type.
+                self.out.write("%stype: tosca.datatypes.Root\n" % indent )
+                logger.info("UNEXPECTED property '%s' of type 'object' with schema %s",
+                            property_name, str(schema))
             elif property_type == "string":
-                self.add_property_from_string(indent, property_name, schema)
+                # This property is of type string
+                self.out.write("%stype: string\n" % indent )
+                self.process_keywords_for_string(indent, property_name, schema)
             elif property_type == "array":
-                self.add_property_from_array(indent, property_name, schema)
+                # This property is of type list
+                self.out.write("%stype: list\n" % indent )
+                self.process_keywords_for_array(indent, property_name, schema)
             elif property_type == "integer":
-                self.add_property_from_integer(indent, property_name, schema)
+                # This property is of type integer
+                self.out.write("%stype: integer\n" % indent )
+                self.process_keywords_for_integer(indent, property_name, schema)
             elif property_type == "number":
-                self.add_property_from_number(indent, property_name, schema)
+                # This property is of type float
+                self.out.write("%stype: float\n" % indent )
+                self.process_keywords_for_number(indent, property_name, schema)
             elif property_type == "boolean":
-                self.add_property_from_boolean(indent, property_name, schema)
+                # This property is of type boolean
+                self.out.write("%stype: boolean\n" % indent )
+                self.process_keywords_for_boolean(indent, property_name, schema)
             elif property_type == "null":
-                self.add_property_from_null(indent, property_name, schema)
+                # This property is of type null
+                self.out.write("%stype: null\n" % indent )
+                self.process_keywords_for_null(indent, property_name, schema)
             else:
                 logger.error("%s: unknown type '%s'", property_name, property_type)
                 return
@@ -566,76 +586,23 @@ class Profile(object):
             # No type specified. Do we have a 'ref'?
             try:
                 schema_name = self.get_ref(schema['$ref'])
-                self.add_property_from_ref(indent, property_name, schema)
+                # Parse the schema name to get 'prefix' and 'kind' so
+                # we can create a type name.
+                group, version, kind, prefix = parse_schema_name(schema_name)
+                if prefix and prefix != self.prefix:
+                    type_name = prefix + ':' + kind
+                else:
+                    type_name = kind
+                self.out.write("%stype: %s\n" % (indent, type_name))
+                # All other keywords must be ignored
             except KeyError:
-                # Not a ref either. Must be any type
-                self.add_property_from_any(indent, property_name, schema)
+                # Not a ref either.  This property can be of any
+                # type. Given the lack of 'any' in TOSCA, we'll just
+                # use 'string'
+                self.out.write("%stype: string\n" % indent )
+                self.process_keywords_for_any(indent, property_name, schema)
 
-    def add_property_from_object(self, indent, property_name, schema):
-        logger.info("property '%s' of type 'object' with schema %s", property_name, str(schema))
-        self.out.write("%stype: tosca.datatypes.Root\n" % indent )
-        
-    def add_property_from_string(self, indent, property_name, schema):
-        self.out.write("%stype: string\n" % indent )
-        
-    def add_property_from_array(self, indent, property_name, schema):
-        # Write type
-        self.out.write("%stype: list\n" % indent )
 
-        # Write entry schema
-        try:
-            entry_schema = self.get_entry_schema(schema['items'])
-            group, version, kind, prefix = parse_schema_name(entry_schema)
-            if prefix and prefix != self.prefix:
-                type_name = prefix + ':' + kind
-            else:
-                type_name = kind
-            self.out.write(
-                "%sentry_schema: %s\n"
-                % (indent, type_name)
-            )
-        except KeyError:
-            pass
-
-        # Write list metadata
-        meta = dict()
-        for field in ['x-kubernetes-list-map-keys', 'x-kubernetes-list-type' ]:
-            try:
-                meta[field] = schema[field]
-            except KeyError:
-                pass
-        if meta: self.emit_metadata(indent, meta)
-
-    def add_property_from_integer(self, indent, property_name, schema):
-        self.out.write("%stype: integer\n" % indent )
-        
-    def add_property_from_number(self, indent, property_name, schema):
-        self.out.write("%stype: float\n" % indent )
-        
-    def add_property_from_boolean(self, indent, property_name, schema):
-        self.out.write("%stype: boolean\n" % indent )
-        
-    def add_property_from_null(self, indent, property_name, schema):
-        self.out.write("%stype: null\n" % indent )
-        
-    def add_property_from_ref(self, indent, property_name, schema):
-        schema_name = self.get_ref(schema['$ref'])
-        group, version, kind, prefix = parse_schema_name(schema_name)
-        if prefix and prefix != self.prefix:
-            type_name = prefix + ':' + kind
-        else:
-            type_name = kind
-        self.out.write(
-            "%stype: %s\n"
-            % (indent, type_name)
-        )
-        
-    def add_property_from_any(self, indent, kind, schema):
-        # This property can be ofany type. Given the lack of 'any' in
-        # TOSCA, we'll just use 'string'
-        self.out.write("%stype: string\n" % indent )
-        
-            
     def get_entry_schema(self, value):
         try:
             return self.get_type(value['type'])
@@ -668,6 +635,17 @@ class Profile(object):
             return ref
 
         
+    def emit_key_value_data(self, indent, data):
+        for key, value in data.items():
+            if isinstance(value, (str, list)):
+                self.out.write("%s%s: %s\n" %
+                               (indent, key, value))
+            else:
+                self.out.write("%s%s:\n" %
+                               (indent, key))
+                self.emit_key_value_data(indent+"  ", value)
+
+
     def get_type(self, type):
         if type == 'array':
             return 'list'
