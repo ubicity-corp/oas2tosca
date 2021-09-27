@@ -328,7 +328,8 @@ class Profile(object):
         The following validation Keywords apply to all types:
         ----------------------------------------------------
           format(string): Allows schema authors to convey semantic
-            information for the values of the given 'type'
+            information for the values of the given 'type'. However,
+            swagger does not support 'format' for strings.
 
           enum(array): An instance validates successfully against this
             keyword if its value is equal to one of the elements in
@@ -347,7 +348,37 @@ class Profile(object):
             instance successfully.
 
         """
-        logger.info("%s: string not fully implemented", name)
+        # Swagger does not support 'format' in strings
+        try:
+            fmt = schema['format']
+            logger.error("%s: format '%s' not supported for strings", name, fmt)
+        except KeyError:
+            pass
+
+        # Turn remaining keywords into constraints
+        try:
+            enum = schema['enum']
+        except KeyError:
+            enum = None
+        try:
+            maxLength = schema['maxLength']
+        except KeyError:
+            maxLength = None
+        try:
+            minLength = schema['minLength']
+        except KeyError:
+            minLength = None
+        try:
+            pattern = schema['pattern']
+        except KeyError:
+            pattern = None
+        if enum or maxLength or minLength or pattern:
+            self.out.write("%sconstraints:\n" % (indent))
+            indent = indent + '  '
+            if enum: self.emit_valid_values(indent, enum)
+            if maxLength: self.emit_max_length(indent, maxLength)
+            if minLength: self.emit_min_length(indent, minLength)
+            if enum: self.emit_pattern_values(indent, pattern)
 
 
     def process_keywords_for_array(self, indent, name, schema):
@@ -766,6 +797,22 @@ class Profile(object):
                                (indent, key))
                 self.emit_key_value_data(indent+"  ", value)
 
+
+    def emit_valid_values(self, indent, enum):
+        self.out.write("%s- valid_values:\n" % indent)
+        indent = indent + '  '
+        for value in enum:
+            self.out.write("%s- %s" % (indent, value))
+
+
+    def emit_max_length(self, indent, maxLength):
+        self.out.write("%s- max_length: %s\n" % (indent, maxLength))
+
+    def emit_min_length(indent, minLength):
+        self.out.write("%s- min_length: %s\n" % (indent, minLength))
+
+    def emit_pattern_values(self, indent, pattern):
+        self.out.write("%s- pattern: '%s'\n" % (indent, pattern))
 
     def get_type(self, type):
         if type == 'array':
