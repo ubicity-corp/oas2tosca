@@ -171,7 +171,31 @@ class Profile(object):
 
 
     def emit_node_type(self, kind, schema):
-        """Emit a node type definition for a JSON Schema object"""
+        """Emit a node type definition for a JSON Schema object. A JSON Schema
+        Object in Swagger has the following:
+
+        $ref(URI Reference): Resolved against the current URI base, it
+          identifies the URI of a schema to use.  All other properties
+          in a "$ref" object MUST be ignored.
+
+        title(string): Title of this schema.
+
+        description(string--GFM syntax can be used for rich text
+          representation): Provides explanation about the purpose of
+          the instance described by this schema.
+
+        default('type'). Supplies a default JSON value associated with
+          this schema.  (Unlike with regular JSON Schema, the value
+          must conform to the defined type for the Schema Object)
+
+        type(string): values must be one of the six primitive types
+          ("null", "boolean", "object", "array", "number", or
+          "string"), or "integer" which matches any number with a zero
+          fractional part.
+
+        In addition, there are a number of type-specific keywords that
+        will be handled separately for each type.
+        """
 
         # Do we have to write the header first?
         if not self.already_has_node_types:
@@ -188,6 +212,19 @@ class Profile(object):
         except KeyError:
             pass
 
+        # Node type definitions do not support 'default'
+        try:
+            default = schema['default']
+            logger.error("%s: 'default' not supported", kind)
+        except KeyError:
+            pass
+        # Node type definitions do not support 'enum'
+        try:
+            enum = schema['enum']
+            logger.error("%s: 'enum' not supported", kind)
+        except KeyError:
+            pass
+        
         # For now, we always derive node types from Root
         self.out.write("%sderived_from: tosca.nodes.Root\n" % indent)
 
@@ -195,49 +232,32 @@ class Profile(object):
         self.process_keywords_for_object(indent, kind, schema)
 
 
-    def emit_description(self, indent, description):
-
-        # Emit description key
-        self.out.write(
-            "%sdescription: "
-            % (indent)
-        )
-        # Emit text. Split into multiple lines if necessary
-        lines = wrap_text(description)
-        self.emit_text_string(indent, lines)
-
-
-    def emit_text_string(self, indent, lines):
-        """Write a text value. We use YAML folded style if the text consists
-        of multiple lines or if it includes a colon character (or some
-        other character that would violate YAML syntax)
-        """
-        if len(lines) > 1 or (':' in lines[0]) or ('\'' in lines[0]) or ('\'' in lines[0]) or ('`' in lines[0]):
-            # Emit folding character
-            self.out.write(">-\n")
-            # Emit individual lines. Make sure the first line is indented
-            # correctly.
-            first = True
-            for line in lines:
-                if first:
-                    self.out.write(
-                        "%s%s\n"
-                        % (indent + '  ', line.lstrip())
-                    )
-                    first = False
-                else:
-                    self.out.write(
-                        "%s%s\n"
-                        % (indent + '  ', line.lstrip())
-                    )
-        else:
-            self.out.write("%s\n"
-                     % lines[0]
-            )
-
-
     def emit_data_type(self, kind, schema):
-        """Emit data type for a JSON Schema object"""
+        """Emit a data type definitions for a JSON Schema object.  A JSON
+        Schema Object in Swagger has the following:
+
+        $ref(URI Reference): Resolved against the current URI base, it
+          identifies the URI of a schema to use.  All other properties
+          in a "$ref" object MUST be ignored.
+
+        title(string): Title of this schema.
+
+        description(string--GFM syntax can be used for rich text
+          representation): Provides explanation about the purpose of
+          the instance described by this schema.
+
+        default('type'). Supplies a default JSON value associated with
+          this schema.  (Unlike with regular JSON Schema, the value
+          must conform to the defined type for the Schema Object)
+
+        type(string): values must be one of the six primitive types
+          ("null", "boolean", "object", "array", "number", or
+          "string"), or "integer" which matches any number with a zero
+          fractional part.
+
+        In addition, there are a number of type-specific keywords that
+        will be handled separately for each type.
+        """
 
         # Do we have to write the header first?
         if not self.already_has_data_types:
@@ -251,6 +271,13 @@ class Profile(object):
         try:
             description = schema['description']
             self.emit_description(indent, description)
+        except KeyError:
+            pass
+
+        # Data type definitions do not support 'default'.
+        try:
+            default = schema['default']
+            logger.error("%s: 'default' not supported", kind)
         except KeyError:
             pass
 
@@ -296,9 +323,32 @@ class Profile(object):
 
 
     def process_keywords_for_string(self, indent, name, schema):
-        """Create a TOSCA data type from a JSON Schema String"""
+        """Process JSON Schema keywords for strings. 
+
+        The following validation Keywords apply to all types:
+        ----------------------------------------------------
+          format(string): Allows schema authors to convey semantic
+            information for the values of the given 'type'
+
+          enum(array): An instance validates successfully against this
+            keyword if its value is equal to one of the elements in
+            this keyword's array value.
+
+        Validation Keywords for Strings
+        -------------------------------
+
+          maxLength(number >= 0): string length must be less than, or
+            equal to, the value of this keyword.
+
+          minLength(number >= 0): string length must be greater than,
+            or equal to, the value of this keyword.
+
+          pattern(string): the regular expression must match the
+            instance successfully.
+
+        """
         logger.info("%s: string not fully implemented", name)
-        
+
 
     def process_keywords_for_array(self, indent, name, schema):
         # Write entry schema
@@ -401,18 +451,6 @@ class Profile(object):
           exclusiveMinimum(number): the instance must have a value
             strictly greater than (not equal to) "exclusiveMinimum".
 
-        Validation Keywords for Strings
-        -------------------------------
-
-          maxLength(number >= 0): string length must be less than, or
-            equal to, the value of this keyword.
-
-          minLength(number >= 0): string length must be greater than,
-            or equal to, the value of this keyword.
-
-          pattern(string): the regular expression must match the
-            instance successfully.
-
         Validation Keywords for Arrays
         ------------------------------
 
@@ -511,7 +549,7 @@ class Profile(object):
             try:
                 required = schema['required']
             except KeyError:
-                required = list()
+                required = set()
             self.add_properties(indent, properties, required)
         except KeyError:
             # No properties
@@ -531,18 +569,60 @@ class Profile(object):
         for property_name, property_schema in properties.items():
             self.add_property(indent, property_name, property_schema, required)
             
-    def add_property(self, indent, property_name, schema, required):
-        """Add a property definition based on the provided schema"""
 
-        # Write out name and description
-        self.out.write(
-            "%s%s:\n"
-            % (indent, property_name)
-        )
+    def add_property(self, indent, property_name, schema, required):
+        """Add a property definition based on the provided JSON schema. A
+        JSON Schema Object in Swagger has the following:
+
+        $ref(URI Reference): Resolved against the current URI base, it
+          identifies the URI of a schema to use.  All other properties
+          in a "$ref" object MUST be ignored.
+
+        title(string): Title of this schema.
+
+        description(string--GFM syntax can be used for rich text
+          representation): Provides explanation about the purpose of
+          the instance described by this schema.
+
+        default('type'). Supplies a default JSON value associated with
+          this schema.  (Unlike with regular JSON Schema, the value
+          must conform to the defined type for the Schema Object)
+
+        Validation Keywords for All Types
+        ---------------------------------
+          type(string): values must be one of the six primitive types
+            ("null", "boolean", "object", "array", "number", or
+            "string"), or "integer" which matches any number with a
+            zero fractional part.
+
+          format(string): Allows schema authors to convey semantic
+            information for the values of the given 'type'
+
+          enum(array): An instance validates successfully against this
+            keyword if its value is equal to one of the elements in
+            this keyword's array value.
+
+        """
+
+        # Write out property name and description
+        self.out.write("%s%s:\n" % (indent, property_name))
         indent = indent + '  '
         try:
             description = schema['description']
             self.emit_description(indent, description)
+        except KeyError:
+            pass
+
+        # Is property required?
+        if property_name in required:
+            self.out.write("%srequired: true\n" % (indent))
+        else:
+            self.out.write("%srequired: false\n" % (indent))
+            
+        # Write default value
+        try:
+            default = schema['default']
+            self.out.write("%sdefault: %s\n" % (indent, default))
         except KeyError:
             pass
 
@@ -635,6 +715,47 @@ class Profile(object):
             return ref
 
         
+    def emit_description(self, indent, description):
+
+        # Emit description key
+        self.out.write(
+            "%sdescription: "
+            % (indent)
+        )
+        # Emit text. Split into multiple lines if necessary
+        lines = wrap_text(description)
+        self.emit_text_string(indent, lines)
+
+
+    def emit_text_string(self, indent, lines):
+        """Write a text value. We use YAML folded style if the text consists
+        of multiple lines or if it includes a colon character (or some
+        other character that would violate YAML syntax)
+        """
+        if len(lines) > 1 or (':' in lines[0]) or ('\'' in lines[0]) or ('\'' in lines[0]) or ('`' in lines[0]):
+            # Emit folding character
+            self.out.write(">-\n")
+            # Emit individual lines. Make sure the first line is indented
+            # correctly.
+            first = True
+            for line in lines:
+                if first:
+                    self.out.write(
+                        "%s%s\n"
+                        % (indent + '  ', line.lstrip())
+                    )
+                    first = False
+                else:
+                    self.out.write(
+                        "%s%s\n"
+                        % (indent + '  ', line.lstrip())
+                    )
+        else:
+            self.out.write("%s\n"
+                     % lines[0]
+            )
+
+
     def emit_key_value_data(self, indent, data):
         for key, value in data.items():
             if isinstance(value, (str, list)):
