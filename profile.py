@@ -298,11 +298,11 @@ class Profile(object):
             elif schema_type == "integer":
                 # This type is derived from integer
                 self.out.write("%sderived_from: integer\n" % indent )
-                self.process_keywords_for_integer(indent, kind, schema)
+                self.process_keywords_for_integers_or_numbers(indent, kind, schema, is_integer=True)
             elif schema_type == "number":
                 # This type is derived from float
                 self.out.write("%sderived_from: float\n" % indent )
-                self.process_keywords_for_number(indent, kind, schema)
+                self.process_keywords_for_integers_or_numbers(indent, kind, schema, is_integer=False)
             elif schema_type == "boolean":
                 # This type is derived from boolean
                 self.out.write("%sderived_from: boolean\n" % indent )
@@ -407,13 +407,8 @@ class Profile(object):
         logger.info("%s: array not fully implemented", name)
 
 
-    def process_keywords_for_number(self, indent, name, schema):
-        """Create a TOSCA data type from a JSON Schema number"""
-        logger.info("%s: number not implemented", name)
-
-
-    def process_keywords_for_integer(self, indent, name, schema):
-        """Process JSON Schema keywords for strings. 
+    def process_keywords_for_integers_or_numbers(self, indent, name, schema, is_integer=True):
+        """Process JSON Schema keywords for integers
 
         The following validation Keywords apply to all types:
         ----------------------------------------------------
@@ -454,11 +449,19 @@ class Profile(object):
         except KeyError:
             pass
 
-        # Turn remaining keywords into constraints
+        # TOSCA can only apply 'format' constraints to integers
         try:
             fmt = schema['format']
         except KeyError:
             fmt = None
+        if not is_integer:
+            if fmt == 'float':
+                pass
+            elif fmt == 'double':
+                self.out.write("%s# This value must actually be of type 'double'\n" % indent)
+            else:
+                logger.error("Unsupported 'number' format '%s'", fmt)
+
         try:
             enum = schema['enum']
         except KeyError:
@@ -479,10 +482,10 @@ class Profile(object):
             exclusive_minimum = schema['exclusiveMinimum']
         except KeyError:
             exclusive_minimum = None
-        if fmt or enum or maximum or minimum or exclusive_maximum or exclusive_minimum:
+        if (fmt and is_integer) or enum or maximum or minimum or exclusive_maximum or exclusive_minimum:
             self.out.write("%sconstraints:\n" % (indent))
             indent = indent + '  '
-            if fmt: self.emit_integer_format(indent, fmt)
+            if (fmt and is_integer): self.emit_integer_format(indent, fmt)
             if enum: self.emit_valid_values(indent, enum)
             if maximum: self.emit_maximum(indent, maximum)
             if minimum: self.emit_minimum(indent, minimum)
@@ -491,8 +494,39 @@ class Profile(object):
 
 
     def process_keywords_for_boolean(self, indent, name, schema):
-        """Create a TOSCA data type from a JSON Schema boolean"""
-        logger.info("%s: boolean not implemented", name)
+        """Process JSON Schema keywords for booleans. A JSON Schema Object in
+        Swagger has the following:
+
+        $ref(URI Reference): Resolved against the current URI base, it
+          identifies the URI of a schema to use.  All other properties
+          in a "$ref" object MUST be ignored.
+
+        title(string): Title of this schema.
+
+        description(string--GFM syntax can be used for rich text
+          representation): Provides explanation about the purpose of
+          the instance described by this schema.
+
+        default('type'). Supplies a default JSON value associated with
+          this schema.  (Unlike with regular JSON Schema, the value
+          must conform to the defined type for the Schema Object)
+
+        Validation Keywords for All Types
+        ---------------------------------
+          type(string): values must be one of the six primitive types
+            ("null", "boolean", "object", "array", "number", or
+            "string"), or "integer" which matches any number with a
+            zero fractional part.
+
+          format(string): Allows schema authors to convey semantic
+            information for the values of the given 'type'
+
+          enum(array): An instance validates successfully against this
+            keyword if its value is equal to one of the elements in
+            this keyword's array value.
+        """
+        # Nothing further to be done for now.
+        pass
 
 
     def process_keywords_for_null(self, indent, name, schema):
@@ -749,11 +783,11 @@ class Profile(object):
             elif property_type == "integer":
                 # This property is of type integer
                 self.out.write("%stype: integer\n" % indent )
-                self.process_keywords_for_integer(indent, property_name, schema)
+                self.process_keywords_for_integers_or_numbers(indent, property_name, schema, is_integer=True)
             elif property_type == "number":
                 # This property is of type float
                 self.out.write("%stype: float\n" % indent )
-                self.process_keywords_for_number(indent, property_name, schema)
+                self.process_keywords_for_integers_or_numbers(indent, property_name, schema, is_integer=False)
             elif property_type == "boolean":
                 # This property is of type boolean
                 self.out.write("%stype: boolean\n" % indent )
