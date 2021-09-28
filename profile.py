@@ -347,13 +347,6 @@ class Profile(object):
             instance successfully.
 
         """
-        # Swagger does not support 'format' in strings
-        try:
-            fmt = schema['format']
-            logger.error("%s: format '%s' not supported for strings", name, fmt)
-        except KeyError:
-            pass
-
         # Turn remaining keywords into constraints
         try:
             enum = schema['enum']
@@ -378,6 +371,73 @@ class Profile(object):
             if maxLength: self.emit_max_length(indent, maxLength)
             if minLength: self.emit_min_length(indent, minLength)
             if pattern: self.emit_pattern(indent, pattern)
+
+
+    def process_keywords_for_map(self, indent, name, schema):
+        """Process JSON Schema keywords for maps. We create a map when a
+        property is of type 'object' and has an 'additionalProperties'
+        keyword
+
+        The following validation Keywords apply to all types:
+        ----------------------------------------------------
+          type(string): values must be one of the six primitive types
+            ("null", "boolean", "object", "array", "number", or
+            "string"), or "integer" which matches any number with a
+            zero fractional part.
+
+          format(string): Allows schema authors to convey semantic
+            information for the values of the given 'type'
+
+          enum(array): An instance validates successfully against this
+            keyword if its value is equal to one of the elements in
+            this keyword's array value.
+
+        Validation Keywords for Objects
+        ------------------------------
+
+          maxProperties(number >= 0): the number of object properties
+            is less than, or equal to, the value of this keyword.
+
+          minProperties(number >= 0): the number of object properties
+            is greater than, or equal to, the value of this keyword.
+
+        Keywords for Applying Subschemas to Objects
+        -------------------------------------------
+
+          additionalProperties(schema): schema for child values of
+            instance names that do not appear in the annotation
+            results of "properties"
+        """
+
+        # Add entry schema
+        try:
+            entry_schema = schema['additionalProperties']
+            if isinstance(entry_schema, list):
+                logger.error("%s: list of entry schemas not supported", name)
+                return
+            self.add_entry_schema(indent, name, entry_schema)
+        except KeyError:
+            pass
+
+        # Add constraints
+        try:
+            enum = schema['enum']
+        except KeyError:
+            enum = None
+        try:
+            maxProperties = schema['maxProperties']
+        except KeyError:
+            maxProperties = None
+        try:
+            minProperties = schema['minProperties']
+        except KeyError:
+            minProperties = None
+        if enum or maxProperties or minProperties:
+            self.out.write("%sconstraints:\n" % (indent))
+            indent = indent + '  '
+            if enum: self.emit_valid_values(indent, enum)
+            if maxProperties: self.emit_max_length(indent, maxProperties)
+            if minProperties: self.emit_min_length(indent, minProperties)
 
 
     def process_keywords_for_array(self, indent, name, schema):
@@ -837,14 +897,15 @@ class Profile(object):
         try:
             property_type = schema['type']
             if property_type == 'object':
-                # Not sure yet what to do here. For now, use
-                # 'tosca.datatypes.Root' as a "generic" type.
-                self.out.write("%stype: tosca.datatypes.Root\n" % indent )
-                logger.info("UNEXPECTED property '%s' of type 'object' with schema %s",
-                            property_name, str(schema))
+                # This property is of type map
+                self.out.write("%stype: map\n" % indent )
+                self.process_keywords_for_map(indent, property_name, schema)
             elif property_type == "string":
-                # This property is of type string
-                self.out.write("%stype: string\n" % indent )
+                # This property is of type string. The actual TOSCA
+                # type to be emitted depends on the 'format' qualifier
+                # in the schema.
+                type_name = self.get_string_type_from_schema(schema)
+                self.out.write("%stype: %s\n" % (indent,type_name) )
                 self.process_keywords_for_string(indent, property_name, schema)
             elif property_type == "array":
                 # This property is of type list
@@ -888,6 +949,28 @@ class Profile(object):
                 # use 'string'
                 self.out.write("%stype: string\n" % indent )
                 self.process_keywords_for_any(indent, property_name, schema)
+
+
+    def get_string_type_from_schema(self, schema):
+        # Check if there is a 'format' keyword
+        try:
+            fmt = schema['format']
+        except KeyError:
+            # No format
+            return 'string'
+        if fmt == 'byte':
+            return 'string'
+        elif fmt == 'binary':
+            return 'string'
+        elif fmt == 'date':
+            return 'timestamp'
+        elif fmt == 'dateTime':
+            return 'timestamp'
+        elif fmt == 'password':
+            return 'string'
+        else:
+            logger.error("Unsupported string format '%s'", format)
+            return 'string'
 
 
     def get_ref(self, ref):
