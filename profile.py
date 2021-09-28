@@ -866,19 +866,6 @@ class Profile(object):
                 self.process_keywords_for_any(indent, property_name, schema)
 
 
-    def get_entry_schema(self, value):
-        try:
-            return self.get_type(value['type'])
-        except KeyError:
-            pass
-        try:
-            return self.get_ref(value['$ref'])
-        except KeyError:
-            pass
-        logger.error("%s: no entry schema found", str(value))
-        return "not found"
-
-
     def get_ref(self, ref):
         # Only support local references for now
         try:
@@ -985,16 +972,6 @@ class Profile(object):
     def emit_exclusive_minimum(self, indent, exclusiveMinimum):
         self.out.write("%s- greater_than: %s\n" % (indent, exclusiveMinimum))
         
-
-    def get_type(self, type):
-        if type == 'array':
-            return 'list'
-        elif type == 'object':
-            return 'tosca.datatypes.Root'
-        elif type == 'number':
-            return 'float'
-        else:
-            return type
 
 
 def wrap_text(text_string):
