@@ -438,7 +438,31 @@ class Profile(object):
             except KeyError:
                 pass
         if meta: self.emit_metadata(indent, meta)
-        logger.info("%s: array not fully implemented", name)
+
+        # Add constraints
+        try:
+            enum = schema['enum']
+        except KeyError:
+            enum = None
+        try:
+            maxItems = schema['maxItems']
+        except KeyError:
+            maxItems = None
+        try:
+            minItems = schema['minItems']
+        except KeyError:
+            minItems = None
+        try:
+            uniqueItems = schema['uniqueItems']
+            logger.error("%s: 'uniqueItems' not supported", name)
+        except KeyError:
+            pass
+        if enum or maxItems or minItems:
+            self.out.write("%sconstraints:\n" % (indent))
+            indent = indent + '  '
+            if enum: self.emit_valid_values(indent, enum)
+            if maxItems: self.emit_max_length(indent, maxItems)
+            if minItems: self.emit_min_length(indent, minItems)
 
 
     def process_keywords_for_integers_or_numbers(self, indent, name, schema, is_integer=True):
