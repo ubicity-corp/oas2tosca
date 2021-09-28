@@ -381,18 +381,52 @@ class Profile(object):
 
 
     def process_keywords_for_array(self, indent, name, schema):
-        # Write entry schema
+        """Process JSON Schema keywords for arrays
+
+        The following validation Keywords apply to all types:
+        ----------------------------------------------------
+          type(string): values must be one of the six primitive types
+            ("null", "boolean", "object", "array", "number", or
+            "string"), or "integer" which matches any number with a
+            zero fractional part.
+
+          format(string): Allows schema authors to convey semantic
+            information for the values of the given 'type'
+
+          enum(array): An instance validates successfully against this
+            keyword if its value is equal to one of the elements in
+            this keyword's array value.
+
+        Validation Keywords for Arrays
+        ------------------------------
+
+          maxItems(number >= 0): the array size must be less than, or
+            equal to, the value of this keyword.
+
+          minItems(number >= 0): the array size must be greater than,
+            or equal to, the value of this keyword.
+
+          uniqueItems(boolean): If true, the instance validates
+            successfully if all of its elements are unique.
+
+        Keywords for Applying Subschemas to Arrays
+        ------------------------------------------
+
+          items(schema or schema[]): If "items" is a schema,
+            validation succeeds if all elements in the array
+            successfully validate against that schema.  If "items" is
+            an array of schemas, validation succeeds if each element
+            of the instance validates against the schema at the same
+            position, if any.
+
+        """
+        # Add entry schema
         try:
-            entry_schema = self.get_entry_schema(schema['items'])
-            group, version, kind, prefix = parse_schema_name(entry_schema)
-            if prefix and prefix != self.prefix:
-                type_name = prefix + ':' + kind
-            else:
-                type_name = kind
-            self.out.write(
-                "%sentry_schema: %s\n"
-                % (indent, type_name)
-            )
+            entry_schema = schema['items']
+            if isinstance(entry_schema, list):
+                logger.error("%s: list of entry schemas not supported", name)
+                return
+            self.add_entry_schema(indent, name, entry_schema)
         except KeyError:
             pass
 
@@ -764,6 +798,18 @@ class Profile(object):
             pass
 
         # Remaining property definitions depend on the property type
+        self.process_keywords_for_type(indent, property_name, schema)
+
+
+    def add_entry_schema(self, indent, name, schema):
+        """Add entry schema for a list or map"""
+        self.out.write("%sentry_schema:\n" % indent)
+        indent = indent + '  '
+        self.process_keywords_for_type(indent, name, schema)
+        
+
+    def process_keywords_for_type(self, indent, property_name, schema):
+        """Process the type-specific keywords for a JSON Schema"""
         try:
             property_type = schema['type']
             if property_type == 'object':
