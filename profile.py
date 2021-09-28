@@ -760,32 +760,6 @@ class Profile(object):
               instance names that do not appear in the annotation
               results of "properties"
 
-        discriminator(string): Adds support for polymorphism. The
-          discriminator is the schema property name that is used to
-          differentiate between other schema that inherit this
-          schema. The property name used MUST be defined at this
-          schema and it MUST be in the required property list. When
-          used, the value MUST be the name of this schema or any
-          schema that inherits it.
-
-        readOnly(boolean): Relevant only for Schema "properties"
-          definitions. Declares the property as "read only". This
-          means that it MAY be sent as part of a response but MUST NOT
-          be sent as part of the request. Properties marked as
-          readOnly being true SHOULD NOT be in the required list of
-          the defined schema. Default value is false.
-
-        xml(XML Object): This MAY be used only on properties
-          schemas. It has no effect on root schemas. Adds Additional
-          metadata to describe the XML representation format of this
-          property.
-
-        externalDocs(External Documentation Object): Additional
-          external documentation for this schema.
-
-        example(any): A free-form property to include an example of an
-          instance for this schema
-
         """
 
         # Emit 'x-kubernetes-group-kind' as metadata
@@ -822,6 +796,11 @@ class Profile(object):
         )
         indent = indent + '  '
         for property_name, property_schema in properties.items():
+            try:
+                readOnly = property_schema['readOnly']
+                logger.info("%s: is really an attribute", property_name)
+            except KeyError:
+                pass
             self.add_property(indent, property_name, property_schema, required)
             
 
@@ -842,6 +821,32 @@ class Profile(object):
         default('type'). Supplies a default JSON value associated with
           this schema.  (Unlike with regular JSON Schema, the value
           must conform to the defined type for the Schema Object)
+
+        discriminator(string): Adds support for polymorphism. The
+          discriminator is the schema property name that is used to
+          differentiate between other schema that inherit this
+          schema. The property name used MUST be defined at this
+          schema and it MUST be in the required property list. When
+          used, the value MUST be the name of this schema or any
+          schema that inherits it.
+
+        readOnly(boolean): Relevant only for Schema "properties"
+          definitions. Declares the property as "read only". This
+          means that it MAY be sent as part of a response but MUST NOT
+          be sent as part of the request. Properties marked as
+          readOnly being true SHOULD NOT be in the required list of
+          the defined schema. Default value is false.
+
+        xml(XML Object): This MAY be used only on properties
+          schemas. It has no effect on root schemas. Adds Additional
+          metadata to describe the XML representation format of this
+          property.
+
+        externalDocs(External Documentation Object): Additional
+          external documentation for this schema.
+
+        example(any): A free-form property to include an example of an
+          instance for this schema
 
         Validation Keywords for All Types
         ---------------------------------
