@@ -170,7 +170,7 @@ class Swagger2(swagger.Swagger):
             logger.debug("Ignoring %s", schema_name)
             return
 
-        # Add dependencies for this profile
+        # Get profile object
         try:
             profile = self.profiles[group]
         except KeyError:
@@ -202,7 +202,15 @@ class Swagger2(swagger.Swagger):
                     if group != property_group:
                         profile.add_dependency(property_group, prefix)
                 except KeyError:
-                    pass
+                    # No items either. additionalProperties?
+                    try:
+                        additionalProperties = property_value['additionalProperties']
+                        property_type = self.get_ref(additionalProperties['$ref'])
+                        property_group, version, kind, prefix = parse_schema_name(property_type)
+                        if group != property_group:
+                            profile.add_dependency(property_group, prefix)
+                    except KeyError:
+                        pass
 
 
     def initialize_profiles(self, top, info):
@@ -587,7 +595,13 @@ class Swagger2(swagger.Swagger):
                     property_type = self.get_ref(items['$ref'])
                     self.definitions.add(property_type)
                 except KeyError:
-                    pass
+                    try:
+                        additionalProperties = property_value['additionalProperties']
+                        property_type = self.get_ref(additionalProperties['$ref'])
+                        self.definitions.add(property_type)
+                    except KeyError:
+                        # No additional schemas
+                        pass
 
 
     def process_definitions(self):
@@ -692,6 +706,17 @@ class Swagger2(swagger.Swagger):
                     else:
                         logger.debug("Duplicate %s", property_type)
                 except KeyError:
+                    try:
+                        additionalProperties = property_schema['additionalProperties']
+                        property_type = self.get_ref(additionalProperties['$ref'])
+                        if not property_type in self.data_types:
+                            self.create_data_type_from_schema(property_type,
+                                                              self.data['definitions'][property_type])
+                        else:
+                            logger.debug("Duplicate %s", property_type)
+                    except KeyError:
+                        # No additional schemas
+                        pass
                     pass
 
 
