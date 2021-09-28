@@ -688,32 +688,23 @@ class Swagger2(swagger.Swagger):
         # Do any properties reference schemas?
         for property_name, property_schema in properties.items():
             try:
-                property_type = self.get_ref(property_schema['$ref'])
-                if not property_type in self.data_types:
-                    self.create_data_type_from_schema(property_type,
-                                                      self.data['definitions'][property_type])
-                else:
-                    logger.debug("Duplicate %s", property_type)
+                schema_name = self.get_ref(property_schema['$ref'])
+                self.create_data_type_from_schema(schema_name,
+                                                  self.data['definitions'][schema_name])
             except KeyError:
                 # Property schema does not contain a $ref. Items
                 # perhaps?
                 try:
                     items = property_schema['items']
-                    property_type = self.get_ref(items['$ref'])
-                    if not property_type in self.data_types:
-                        self.create_data_type_from_schema(property_type,
-                                                          self.data['definitions'][property_type])
-                    else:
-                        logger.debug("Duplicate %s", property_type)
+                    schema_name = self.get_ref(items['$ref'])
+                    self.create_data_type_from_schema(schema_name,
+                                                      self.data['definitions'][schema_name])
                 except KeyError:
                     try:
                         additionalProperties = property_schema['additionalProperties']
-                        property_type = self.get_ref(additionalProperties['$ref'])
-                        if not property_type in self.data_types:
-                            self.create_data_type_from_schema(property_type,
-                                                              self.data['definitions'][property_type])
-                        else:
-                            logger.debug("Duplicate %s", property_type)
+                        schema_name = self.get_ref(additionalProperties['$ref'])
+                        self.create_data_type_from_schema(schema_name,
+                                                          self.data['definitions'][schema_name])
                     except KeyError:
                         # No additional schemas
                         pass
