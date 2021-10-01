@@ -16,6 +16,7 @@ import argparse
 
 # Support for swagger files
 from read import read_swagger
+import swagger
 import swagger2
 import swagger3
 
@@ -61,11 +62,11 @@ except Exception as e:
 
 # Invoke the appropriate converter
 try:
-    swagger_version = swagger_data['swagger']
-    if swagger_version == '2.0':
+    swagger_version = swagger.get_version(swagger_data)
+    if swagger_version[0] == '2':
         logger.info("Converting Swagger 2.0 file")
         swagger = swagger2.Swagger2(swagger_data)
-    elif swagger_version == '3.0':
+    elif swagger_version[0] == '3':
         logger.info("Converting Swagger 3.0 file")
         swagger = swagger3.Swagger3(swagger_data)
     else:

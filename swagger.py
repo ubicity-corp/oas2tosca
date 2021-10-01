@@ -17,7 +17,32 @@ import sys
 # YAML support. 
 from ruamel.yaml import YAML
 
+
+def get_version(data):
+    """Return the version of the OpenAPI/Swagger data
+
+    Args:
+      data(dict): OpenAPI document
+
+    Returns
+      version(string)
+
+    Raises:
+      KeyError: when no version information found
+    """
+
+    try:
+        # OpenAPI v2 uses the 'swagger' attribute to store version
+        # information
+        return data['swagger']
+    except KeyError:
+        # OpenAPI v3 uses the 'openapi' attribute to store version
+        # information
+        return data['openapi']
+
+
 class Swagger(object):
+    """Version-independent swagger object"""
 
     def __init__(self, swagger_data):
         """Constructor """
