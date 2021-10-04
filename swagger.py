@@ -108,6 +108,8 @@ class Swagger(object):
             self.process_path_object(name, value)
 
             
+
+
     def process_path_object(self, name, value):
         """A Path Object in Swagger 2 has the following:
 
@@ -220,6 +222,114 @@ class Swagger(object):
         profile = self.profiles[group]
         profile.emit_node_type(kind, schema)
         
+
+    def process_definitions(self):
+        """Process the Definitions Object which holds data types produced and
+        consumed by operations.
+
+        """
+        # Make sure this swagger file has definitions
+        definitions = self.get_definitions()
+        for definition in self.definitions:
+            try:
+                value = definitions[definition]
+            except KeyError:
+                logger.error("Definition %s not found", definition)
+                continue
+            # Get the schema name
+            self.create_data_type_from_schema(definition, value)
+            if definition in self.node_types:
+                logger.info("%s is also node type", key)
+
+
+    def create_data_type_from_schema(self, schema_name, schema):
+        """Create a TOSCA data type from a JSON Schema"""
+
+        # Avoid duplicates
+        if schema_name in self.data_types:
+            logger.debug("%s: duplicate", schema_name)
+            return
+        self.data_types.add(schema_name)
+
+        # If this schema is intended to define a data type, this
+        # schema must not reference another schema.
+        try:
+            ref = schema['$ref']
+            logger.error("%s REFERENCES %s", schema_name, ref)
+            return
+        except KeyError:
+            pass
+
+        # Get the full schema name
+        schema_name = self.get_full_schema_name(schema_name, schema)
+        logger.info("Creating data type for %s", schema_name)
+        
+        # Parse group, version, and kind from the schema name. 
+        group, version, kind, prefix = parse_schema_name(schema_name)
+        logger.info("In profile %s", group)
+        
+        # We only handle v1 for now
+        if version and version != "v1":
+            logger.info("Ignoring %s version of %s", version, kind)
+            return
+        
+        # k8s schemas for data types must not include a
+        # 'x-kubernetes-group-version-kind' attribute. Note that the
+        # value of 'x-kubernetes-group-version-kind' is a list. Not
+        # sure why.
+        try:
+            group_version_kind_list = schema['x-kubernetes-group-version-kind']
+            logger.error("%s: creating data type with group version kind", schema_name)
+        except KeyError:
+            pass
+        
+        # Make sure we define data types for any properties defined in
+        # this schema
+        try:
+            self.create_data_types_for_properties(schema)
+        except Exception as e:
+            logger.error("%s: %s", schema_name, str(e))
+
+        # Create the data type in the profile for this schema
+        profile = self.profiles[group]
+        profile.emit_data_type(kind, schema)
+
+
+    def create_data_types_for_properties(self, schema):
+        """Create data types for property schemas referenced in this schema
+        """
+        # Does this schema have property definitions?
+        try:
+            properties = schema['properties']
+        except KeyError:
+            # No properties
+            return
+
+        # Do any properties reference schemas?
+        for property_name, property_schema in properties.items():
+            try:
+                schema_name = self.get_ref(property_schema['$ref'])
+                self.create_data_type_from_schema(schema_name,
+                                                  self.data['definitions'][schema_name])
+            except KeyError:
+                # Property schema does not contain a $ref. Items
+                # perhaps?
+                try:
+                    items = property_schema['items']
+                    schema_name = self.get_ref(items['$ref'])
+                    self.create_data_type_from_schema(schema_name,
+                                                      self.data['definitions'][schema_name])
+                except KeyError:
+                    try:
+                        additionalProperties = property_schema['additionalProperties']
+                        schema_name = self.get_ref(additionalProperties['$ref'])
+                        self.create_data_type_from_schema(schema_name,
+                                                          self.data['definitions'][schema_name])
+                    except KeyError:
+                        # No additional schemas
+                        pass
+                    pass
+
 
 
 def parse_schema_name(schema_name):

@@ -82,6 +82,29 @@ class Swagger3(swagger.Swagger):
         # Extract node types from 'path' objects
         self.process_paths()
 
+        # Create data types based on 'definitions'
+        self.process_definitions()
+
+        self.finalize_profiles()
+
+
+    def get_full_schema_name(self, schema_name, schema):
+        # Extract the profile name from the schema name.
+        try:
+            return schema['x-swagger-router-model']
+        except KeyError:
+            return schema_name
+
+    
+    def get_definitions(self):
+        """Get schemas for data type definitions
+        """
+        # Make sure this swagger file has definitions
+        try:
+            return self.data['components']['schemas']
+        except KeyError:
+            return dict()
+
 
     def get_profile_names(self):
         """Scan the 'components' section of the Swagger object to find the
@@ -133,29 +156,35 @@ class Swagger3(swagger.Swagger):
         for property_name, property_value in properties.items():
             try:
                 # No type specified. Use $ref instead
-                property_schema = self.get_referenced_schema(property_value['$ref'])
+                ref = property_value['$ref']
+                schema_ref = self.get_ref(ref)
+                property_schema = self.get_referenced_schema(ref)
                 property_type = property_schema['x-swagger-router-model']
                 property_profile, version, property_resource, prefix = parse_schema_name(property_type)
-                if property_profile != property_profile:
+                if property_profile and property_profile != property_name:
                     profile.add_dependency(property_profile, prefix)
             except KeyError:
                 # Property schema does not contain a $ref. Items
                 # perhaps?
                 try:
                     items = property_value['items']
-                    property_schema = self.get_referenced_schema(items['$ref'])
+                    ref = items['$ref']
+                    schema_ref = self.get_ref(ref)
+                    property_schema = self.get_referenced_schema(ref)
                     property_type = property_schema['x-swagger-router-model']
                     property_profile, version, property_resource, prefix = parse_schema_name(property_type)
-                    if property_profile != property_profile:
+                    if property_profile and property_profile != property_name:
                         profile.add_dependency(property_profile, prefix)
                 except KeyError:
                     # No items either. additionalProperties?
                     try:
                         additionalProperties = property_value['additionalProperties']
-                        property_schema = self.get_referenced_schema(additionalProperties['$ref'])
+                        ref = additionalProperties['$ref']
+                        schema_ref = self.get_ref(ref)
+                        property_schema = self.get_referenced_schema(ref)
                         property_type = property_schema['x-swagger-router-model']
                         property_profile, version, property_resource, prefix = parse_schema_name(property_type)
-                        if property_profile != property_profile:
+                        if property_profile and property_profile != property_name:
                             profile.add_dependency(property_profile, prefix)
                     except KeyError:
                         pass
@@ -426,27 +455,47 @@ class Swagger3(swagger.Swagger):
         for property_name, property_value in properties.items():
             try:
                 # No type specified. Use $ref instead
-                property_schema = self.get_referenced_schema(property_value['$ref'])
-                property_type = property_schema['x-swagger-router-model']
-                self.definitions.add(property_type)
+                ref = property_value['$ref']
+                schema_ref = self.get_ref(ref)
+                property_schema = self.get_referenced_schema(ref)
+                self.definitions.add(schema_ref)
             except KeyError:
                 # Property schema does not contain a $ref. Items
                 # perhaps?
                 try:
                     items = property_value['items']
-                    property_schema = self.get_referenced_schema(items['$ref'])
-                    property_type = property_schema['x-swagger-router-model']
-                    self.definitions.add(property_type)
+                    ref = items['$ref']
+                    schema_ref = self.get_ref(ref)
+                    self.definitions.add(schema_ref)
                 except KeyError:
                     try:
                         additionalProperties = property_value['additionalProperties']
-                        property_schema = self.get_referenced_schema(additionalProperties['$ref'])
-                        property_type = property_schema['x-swagger-router-model']
-                        self.definitions.add(property_type)
+                        ref = additionalProperties['$ref']
+                        schema_ref = self.get_ref(ref)
+                        self.definitions.add(schema_ref)
                     except KeyError:
                         # No additional schemas
                         pass
 
+
+    def get_ref(self, ref):
+        # Only support local references for now
+        try:
+            if ref[0] != '#':
+                logger.error("%s: not a local reference", ref)
+                return
+        except Exception as e:
+            logger.error("%s: not a ref (%s)", str(ref), str(e))
+            return
+        # Make sure we reference a schema component
+        prefix = "#/components/schemas/"
+        if ref.startswith(prefix):
+            # Strip prefix
+            return ref[len(prefix):]
+        else:
+            logger.error("%s: not a ref to a schema", ref)
+            return ref
+        
 
 def parse_schema_name(schema_name):
     """Parse schema name into 'profile', 'version', 'resource', and 'prefix' tuple.

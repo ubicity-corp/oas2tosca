@@ -276,6 +276,8 @@ class Profile(object):
         will be handled separately for each type.
         """
 
+        lgger.info("Emit data type %s", kind)
+        
         # Do we have to write the header first?
         if not self.already_has_data_types:
             self.out.write("data_types:\n\n")
@@ -1010,12 +1012,16 @@ class Profile(object):
             # Strip prefix
             return ref[len(prefix):]
         else:
-            logger.error("%s: not a ref to a definition", ref)
-            return ref
+            prefix = "#/components/schemas/"
+            if ref.startswith(prefix):
+                # Strip prefix
+                return ref[len(prefix):]
+            else:
+                logger.error("%s: not a ref to a schema", ref)
+                return ref
 
         
     def emit_description(self, indent, description):
-
         # Emit description key
         self.out.write(
             "%sdescription: "
