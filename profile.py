@@ -143,7 +143,24 @@ class Profile(object):
 
         """
         indent = ""
-        self.emit_metadata(indent, swagger_info)
+
+        # Write description separately from the other 'info'
+        try:
+            description = swagger_info['description']
+            self.emit_description(indent, description)
+            self.out.write("\n")
+        except KeyError:
+            pass
+
+        # Write the rest of the meta data
+        meta_data = dict()
+        for key in ['title', 'termsOfService', 'contact', 'license', 'version']:
+            try:
+                meta_data[key] = swagger_info[key]
+            except KeyError:
+                pass
+        if meta_data:
+            self.emit_metadata(indent, meta_data)
         self.out.write("\n")
         
 
