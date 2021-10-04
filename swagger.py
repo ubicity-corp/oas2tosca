@@ -90,3 +90,161 @@ class Swagger(object):
         for name, profile in self.profiles.items():
             profile.finalize()
         
+    def process_paths(self):
+        """Process the (required) Paths Object, which defines a list of
+        available paths and associated operations for the API.
+        """
+        # Check if this swagger file has paths
+        try:
+            paths = self.data['paths']
+            logger.debug("Processing Paths Object")
+        except KeyError:
+            paths = None
+        if not paths:
+            logger.error("No Paths Object")
+            return
+
+        for name, value in paths.items():
+            self.process_path_object(name, value)
+
+            
+    def process_path_object(self, name, value):
+        """A Path Object in Swagger 2 has the following:
+
+        $ref(string): Allows for an external definition of this path
+          item. The referenced structure MUST be in the format of a
+          Path Item Object. If there are conflicts between the
+          referenced definition and this Path Item's definition, the
+          behavior is undefined.
+        get(Operation Object): A definition of a GET operation on this
+          path.
+        put(Operation Object): A definition of a PUT operation on this
+          path.
+        post(Operation Object): A definition of a POST operation on
+          this path.
+        delete(Operation Object): A definition of a DELETE operation
+          on this path.
+        options(Operation Object): A definition of a OPTIONS operation
+          on this path.
+        head(Operation Object): A definition of a HEAD operation on
+          this path.
+        patch(Operation Object): A definition of a PATCH operation on
+          this path.
+        parameters([Parameter Object | Reference Object]): A list of
+          parameters that are applicable for all the operations
+          described under this path. These parameters can be
+          overridden at the operation level, but cannot be removed
+          there. The list MUST NOT include duplicated parameters. A
+          unique parameter is defined by a combination of a name and
+          location. The list can use the Reference Object to link to
+          parameters that are defined at the Swagger Object's
+          parameters. There can be one "body" parameter at most.
+
+        In addition, Swagger 3 adds the following:
+
+        summary(string): An optional, string summary, intended to
+          apply to all operations in this path.
+
+        description(string): An optional, string description, intended
+          to apply to all operations in this path. CommonMark syntax
+          MAY be used for rich text representation.
+
+        trace(Operation Object): A definition of a TRACE operation on
+          this path.
+
+        servers([Server Object]): An alternative server array to
+          service all operations in this path.
+        """
+
+        # Can we create a resource on this path?
+        try:
+            post = value['post']
+        except KeyError:
+            post = None
+        if not post:
+            logger.debug("'%s' does not have POST", name)
+            return
+        
+        # Are there path-level parameters?
+        try:
+            parameters = value['parameters']
+        except KeyError:
+            parameters = list()
+        logger.debug("'%s' parameters:", name)
+        for parameter in parameters:
+            self.process_parameter_object(name, parameter)
+            
+        self.process_operation_object(name, post)
+
+        
+    def create_node_type_from_schema(self, schema_name, schema):
+        """Create a TOSCA node type from a JSON Schema"""
+        
+        # Avoid duplicates
+        if schema_name in self.node_types:
+            logger.info("%s: duplicate", schema_name)
+            return
+        self.node_types.add(schema_name)
+        
+        # If this schema is intended to define a node type, the schema
+        # 'type' better be 'object'.
+        try:
+            if not schema['type'] == 'object':
+                logger.error("Node type '%s' with type '%s'", schema_name, schema['type'])
+                return
+        except KeyError:
+                logger.error("Trying to create node type '%s' without a type",
+                             schema_name)
+                return
+
+        # Parse group, version, prefix, and kind from the schema name. 
+        group, version, kind, prefix = parse_schema_name(schema_name)
+        # For now, we only handle v1
+        if version and version != 'v1':
+            logger.debug("Ignoring %s version of %s", version, kind)
+            return
+
+        # k8s 'resources' include a 'x-kubernetes-group-version-kind'
+        # attribute. Note that the value of
+        # 'x-kubernetes-group-version-kind' is a list. Not sure why.
+        try:
+            group_version_kind_list = schema['x-kubernetes-group-version-kind']
+        except KeyError:
+            logger.error("%s: creating node type without group version kind", schema_name)
+
+        # Make sure we plan to define data types for any properties
+        # defined in this schema
+        self.plan_data_types_for_properties(schema)
+
+        # Create the node type in the profile for this schema
+        profile = self.profiles[group]
+        profile.emit_node_type(kind, schema)
+        
+
+
+def parse_schema_name(schema_name):
+    """Parse schema name into 'group', 'version', 'kind', and 'prefix'
+    tuple.
+    """
+
+    # Split schema name using '.' separator
+    split = schema_name.split('.')
+    length = len(split)
+
+    # Don't bother splitting if there are not enough parts.
+    if length < 3:
+        return "", "", schema_name, ""
+        
+    # Versions start with 'v1' or 'v2'
+    if split[length-2][:2] == 'v1' or split[length-2][:2] == 'v2':
+        version = split[length-2]
+        prefix = split[length-3]
+        group = ".".join(split[0:length-2])
+    else:
+        version = ""
+        prefix = split[length-2]
+        group = ".".join(split[0:length-1])
+    kind = split[length-1]
+    return (group, version, kind, prefix)
+
+

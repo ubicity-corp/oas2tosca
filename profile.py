@@ -1070,7 +1070,7 @@ class Profile(object):
         self.out.write("%s- valid_values:\n" % indent)
         indent = indent + '  '
         for value in enum:
-            self.out.write("%s- %s" % (indent, value))
+            self.out.write("%s- %s\n" % (indent, value))
 
     def emit_max_length(self, indent, maxLength):
         self.out.write("%s- max_length: %s\n" % (indent, maxLength))
