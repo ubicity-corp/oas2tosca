@@ -60,14 +60,6 @@ class Swagger3(swagger.Swagger):
 
     """
 
-    def get_full_schema_name(self, schema_name, schema):
-        # Extract the profile name from the schema name.
-        try:
-            return schema['x-swagger-router-model']
-        except KeyError:
-            return schema_name
-
-    
     def get_definitions(self):
         """Get schemas for data type definitions
         """
@@ -78,17 +70,14 @@ class Swagger3(swagger.Swagger):
             return dict()
 
 
-    def get_profile_names_from_schema(self, name, schema):
+    def get_profile_names_from_schema(self, schema_name, schema):
         """Find profile names in a schema definition"""
         
         # Extract the profile name from the schema name.
-        try:
-            schema_name = schema['x-swagger-router-model']
-            profile_name, version, resource, prefix = parse_schema_name(schema_name)
-        except KeyError:
-            logger.error("%s: no 'x-swagger-router-model'", name)
+        profile_name, version, resource, prefix = self.parse_schema_name(schema_name, schema)
+        if not profile_name:
             return
-
+        
         # Get profile object
         try:
             profile = self.profiles[profile_name]
@@ -110,8 +99,7 @@ class Swagger3(swagger.Swagger):
                 ref = property_value['$ref']
                 schema_ref = self.get_ref(ref)
                 property_schema = self.get_referenced_schema(ref)
-                property_type = property_schema['x-swagger-router-model']
-                property_profile, version, property_resource, prefix = parse_schema_name(property_type)
+                property_profile, version, property_resource, prefix = self.parse_schema_name(schema_ref, property_schema)
                 if property_profile and property_profile != property_name:
                     profile.add_dependency(property_profile, prefix)
             except KeyError:
@@ -122,8 +110,7 @@ class Swagger3(swagger.Swagger):
                     ref = items['$ref']
                     schema_ref = self.get_ref(ref)
                     property_schema = self.get_referenced_schema(ref)
-                    property_type = property_schema['x-swagger-router-model']
-                    property_profile, version, property_resource, prefix = parse_schema_name(property_type)
+                    property_profile, version, property_resource, prefix = self.parse_schema_name(schema_ref, property_schema)
                     if property_profile and property_profile != property_name:
                         profile.add_dependency(property_profile, prefix)
                 except KeyError:
@@ -133,8 +120,7 @@ class Swagger3(swagger.Swagger):
                         ref = additionalProperties['$ref']
                         schema_ref = self.get_ref(ref)
                         property_schema = self.get_referenced_schema(ref)
-                        property_type = property_schema['x-swagger-router-model']
-                        property_profile, version, property_resource, prefix = parse_schema_name(property_type)
+                        property_profile, version, property_resource, prefix = self.parse_schema_name(schema_ref, property_schema)
                         if property_profile and property_profile != property_name:
                             profile.add_dependency(property_profile, prefix)
                     except KeyError:
@@ -311,18 +297,16 @@ class Swagger3(swagger.Swagger):
         
 
     def process_media_type_object(self, name, media_type):
-        """An Media Type Object in Swagger 3 has the following:
+        """A Media Type Object in Swagger 3 has the following:
 
         schema (Schema Object | Reference Object ): The schema
           defining the content of the request, response, or parameter.
-
         example(Any ): Example of the media type. The example object
           SHOULD be in the correct format as specified by the media
           type. The example field is mutually exclusive of the
           examples field. Furthermore, if referencing a schema which
           contains an example, the example value SHALL override the
           example provided by the schema.
-
         examples (Map[ string, Example Object | Reference Object]):
           Examples of the media type. Each example object SHOULD match
           the media type and specified schema if present. The examples
@@ -330,7 +314,6 @@ class Swagger3(swagger.Swagger):
           field. Furthermore, if referencing a schema which contains
           an example, the examples value SHALL override the example
           provided by the schema.
-
         encoding (Map[string, Encoding Object] ): A map between a
           property name and its encoding information. The key, being
           the property name, MUST exist in the schema as a
@@ -346,6 +329,7 @@ class Swagger3(swagger.Swagger):
         media_type_schema = media_type['schema']
         try:
             ref = media_type_schema['$ref']
+            schema_name = self.get_ref(ref)
         except KeyError:
             logger.error("%s: creating node type from in-place schema not implemented",
                          name)
@@ -357,13 +341,6 @@ class Swagger3(swagger.Swagger):
             logger.info("%s: referenced schema not found", name)
             return
 
-        # Get the schema name from the 'x-swagger-router-model' keyword
-        try:
-            schema_name = schema['x-swagger-router-model']
-        except KeyError:
-            logger.error("%s: trying to create node type without keyword' keyword", name)
-            return
-        
         logger.info("%s: creating node type for %s", name, schema_name)
         self.create_node_type_from_schema(schema_name, schema)
 
@@ -448,23 +425,3 @@ class Swagger3(swagger.Swagger):
             return ref
         
 
-def parse_schema_name(schema_name):
-    """Parse schema name into 'profile', 'version', 'resource', and 'prefix' tuple.
-    """
-
-    # Split schema name using '.' separator
-    split = schema_name.split('.')
-    length = len(split)
-
-    # Don't bother splitting if there are not enough parts.
-    if length < 2:
-        return "", "", schema_name, ""
-        
-    prefix = split[length-2]
-    profile = ".".join(split[0:length-1])
-    resource = split[length-1]
-    version = ""
-    return (profile, version, resource, prefix)
-
-
-                    

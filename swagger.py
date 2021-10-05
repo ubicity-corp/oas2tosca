@@ -132,23 +132,17 @@ class Swagger(object):
         A swagger Info Object has the following properties:
 
           title(string): Required. The title of the application.
-
           description(string): A short description of the
             application. GFM syntax can be used for rich text
             representation.
-
           termsOfService(string): The Terms of Service for the API.
-
           contact(Contact Object): The contact information for the
             exposed API.
-
           license(License Object): The license information for the
             exposed API.
-
           version(string): Required Provides the version of the
             application API (not to be confused with the specification
             version)
-
         """
         return self.data['info']
 
@@ -179,8 +173,6 @@ class Swagger(object):
 
         for name, value in paths.items():
             self.process_path_object(name, value)
-
-            
 
 
     def process_path_object(self, name, value):
@@ -219,14 +211,11 @@ class Swagger(object):
 
         summary(string): An optional, string summary, intended to
           apply to all operations in this path.
-
         description(string): An optional, string description, intended
           to apply to all operations in this path. CommonMark syntax
           MAY be used for rich text representation.
-
         trace(Operation Object): A definition of a TRACE operation on
           this path.
-
         servers([Server Object]): An alternative server array to
           service all operations in this path.
         """
@@ -273,7 +262,7 @@ class Swagger(object):
                 return
 
         # Parse group, version, prefix, and kind from the schema name. 
-        group, version, kind, prefix = parse_schema_name(schema_name)
+        group, version, kind, prefix = self.parse_schema_name(schema_name, schema)
         # For now, we only handle v1
         if version and version != 'v1':
             logger.debug("Ignoring %s version of %s", version, kind)
@@ -333,12 +322,8 @@ class Swagger(object):
         except KeyError:
             pass
 
-        # Get the full schema name
-        schema_name = self.get_full_schema_name(schema_name, schema)
-        logger.info("Creating data type for %s", schema_name)
-        
         # Parse group, version, and kind from the schema name. 
-        group, version, kind, prefix = parse_schema_name(schema_name)
+        group, version, kind, prefix = self.parse_schema_name(schema_name, schema)
         logger.info("In profile %s", group)
         
         # We only handle v1 for now
@@ -404,30 +389,43 @@ class Swagger(object):
                     pass
 
 
+    def parse_schema_name(self, schema_name, schema):
+        """Parse schema name into a type info tuple that consists of
+        'profile', 'version', 'name', and 'prefix'.
+        """
 
-def parse_schema_name(schema_name):
-    """Parse schema name into 'group', 'version', 'kind', and 'prefix'
-    tuple.
-    """
+        # Try to extract the model name from the schema.
+        try:
+            model_name = schema['x-swagger-router-model']
+        except KeyError:
+            # No router model. Just use schema name
+            model_name = schema_name
 
-    # Split schema name using '.' separator
-    split = schema_name.split('.')
-    length = len(split)
+        # Split schema name using '.' separator
+        split = model_name.split('.')
+        length = len(split)
 
-    # Don't bother splitting if there are not enough parts.
-    if length < 3:
-        return "", "", schema_name, ""
-        
-    # Versions start with 'v1' or 'v2'
-    if split[length-2][:2] == 'v1' or split[length-2][:2] == 'v2':
-        version = split[length-2]
-        prefix = split[length-3]
-        group = ".".join(split[0:length-2])
-    else:
-        version = ""
-        prefix = split[length-2]
-        group = ".".join(split[0:length-1])
-    kind = split[length-1]
-    return (group, version, kind, prefix)
+        # If there is only one part, just return the model name as the
+        # type name.
+        if length < 2:
+            return "", "", model_name, ""
+
+        # If there are two parts, split the model name into a profile
+        # name and a type, and use the model name as the prefix.
+        if length == 2:
+            return split[0], "", split[1], split[0]
+
+        # Check if there is a version string. Versions start with 'v1'
+        # or 'v2'
+        if split[length-2][:2] == 'v1' or split[length-2][:2] == 'v2':
+            version = split[length-2]
+            prefix = split[length-3]
+            profile = ".".join(split[0:length-2])
+        else:
+            version = ""
+            prefix = split[length-2]
+            profile = ".".join(split[0:length-1])
+        name = split[length-1]
+        return (profile, version, name, prefix)
 
 

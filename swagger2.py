@@ -27,77 +27,62 @@ class Swagger2(swagger.Swagger):
       swagger(string): Required. Specifies the Swagger Specification
         version being used. It can be used by the Swagger UI and other
         clients to interpret the API listing. The value MUST be "2.0".
-
       info(Info Object): Required. Provides metadata about the
         API. The metadata can be used by the clients if needed.
-
       host(string): The host (name or ip) serving the API. This MUST
         be the host only and does not include the scheme nor
         sub-paths. It MAY include a port. If the host is not included,
         the host serving the documentation is to be used (including
         the port). The host does not support path templating.
-
       basePath(string): The base path on which the API is served,
         which is relative to the host. If it is not included, the API
         is served directly under the host. The value MUST start with a
         leading slash (/). The basePath does not support path
         templating.
-
       schemes([string]): The transfer protocol of the API. Values MUST
         be from the list: "http", "https", "ws", "wss". If the schemes
         is not included, the default scheme to be used is the one used
         to access the Swagger definition itself.
-
       consumes([string]): A list of MIME types the APIs can
         consume. This is global to all APIs but can be overridden on
         specific API calls. Value MUST be as described under Mime
         Types.
-
       produces([string]): A list of MIME types the APIs can
         produce. This is global to all APIs but can be overridden on
         specific API calls. Value MUST be as described under Mime
         Types.
-
       paths(Paths Object): Required. The available paths and
         operations for the API.
-
       definitions(Definitions Object): An object to hold data types
         produced and consumed by operations.
-
       parameters(Parameters Definitions Object): An object to hold
         parameters that can be used across operations. This property
         does not define global parameters for all operations.
-
       responses(Responses Definitions Object): An object to hold
         responses that can be used across operations. This property
         does not define global responses for all operations.
-
       securityDefinitions(Security Definitions Object): Security
         scheme definitions that can be used across the specification.
-
       security([Security Requirement Object]): A declaration of which
         security schemes are applied for the API as a whole. The list
         of values describes alternative security schemes that can be
         used (that is, there is a logical OR between the security
         requirements). Individual operations can override this
         definition.
-
       tags([Tag Object]): A list of tags used by the specification
         with additional metadata. The order of the tags can be used to
         reflect on their order by the parsing tools. Not all tags that
         are used by the Operation Object must be declared. The tags
         that are not declared may be organized randomly or based on
         the tools' logic. Each tag name in the list MUST be unique.
-
       externalDocs(External Documentation Object): Additional external
         documentation.
-
     """
 
     def get_profile_names_from_schema(self, schema_name, schema):
         # Extract the group name from the schema name. This group name
         # will be used as the profile name.
-        group, version, kind, prefix = parse_schema_name(schema_name)
+        group, version, kind, prefix = self.parse_schema_name(schema_name, schema)
         if not group:
             logger.error("%s: no group", schema_name)
             return
@@ -126,7 +111,7 @@ class Swagger2(swagger.Swagger):
             try:
                 # No type specified. Use $ref instead
                 property_type = self.get_ref(property_value['$ref'])
-                property_group, version, kind, prefix = parse_schema_name(property_type)
+                property_group, version, kind, prefix = self.parse_schema_name(property_type, schema)
                 if group != property_group:
                     profile.add_dependency(property_group, prefix)
             except KeyError:
@@ -135,7 +120,7 @@ class Swagger2(swagger.Swagger):
                 try:
                     items = property_value['items']
                     property_type = self.get_ref(items['$ref'])
-                    property_group, version, kind, prefix = parse_schema_name(property_type)
+                    property_group, version, kind, prefix = self.parse_schema_name(property_type, schema)
                     if group != property_group:
                         profile.add_dependency(property_group, prefix)
                 except KeyError:
@@ -143,7 +128,7 @@ class Swagger2(swagger.Swagger):
                     try:
                         additionalProperties = property_value['additionalProperties']
                         property_type = self.get_ref(additionalProperties['$ref'])
-                        property_group, version, kind, prefix = parse_schema_name(property_type)
+                        property_group, version, kind, prefix = self.parse_schema_name(property_type, schema)
                         if group != property_group:
                             profile.add_dependency(property_group, prefix)
                     except KeyError:
@@ -416,9 +401,6 @@ class Swagger2(swagger.Swagger):
             return ref
 
         
-    def get_full_schema_name(self, schema_name, schema):
-        return schema_name
-    
     def process_parameters(self):
         """Process the Parameters Definitions Object which holds parameters
         that can be used across operations. This property does not
@@ -506,46 +488,3 @@ class Swagger2(swagger.Swagger):
         except KeyError:
             logger.debug("No ExternalDocs")
             return
-
-
-def wrap_text(text_string):
-    """Split a text string into multiple lines to improve legibility
-    """
-    # First, check to see if the text was already formatted. We do
-    # this by trying to split the text string into mutliple lines
-    # based on newlines contained in the string.
-    lines = text_string.splitlines()
-    if len(lines) > 1:
-        # Already formatted
-        return lines
-
-    # Not already formatted. Wrap it ourselves.
-    return textwrap.wrap(text_string)
-
-
-def parse_schema_name(schema_name):
-    """Parse schema name into 'group', 'version', 'kind', and 'prefix'
-    tuple.
-    """
-
-    # Split schema name using '.' separator
-    split = schema_name.split('.')
-    length = len(split)
-
-    # Don't bother splitting if there are not enough parts.
-    if length < 3:
-        return "", "", schema_name, ""
-        
-    # Versions start with 'v1' or 'v2'
-    if split[length-2][:2] == 'v1' or split[length-2][:2] == 'v2':
-        version = split[length-2]
-        prefix = split[length-3]
-        group = ".".join(split[0:length-2])
-    else:
-        version = ""
-        prefix = split[length-2]
-        group = ".".join(split[0:length-1])
-    kind = split[length-1]
-    return (group, version, kind, prefix)
-
-
