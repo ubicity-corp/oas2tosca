@@ -14,10 +14,6 @@ logger = logging.getLogger(__name__)
 # System support
 import sys
 
-# YAML support. 
-from ruamel.yaml import YAML
-
-
 def get_version(data):
     """Return the version of the OpenAPI/Swagger data
 
@@ -42,7 +38,9 @@ def get_version(data):
 
 
 class Swagger(object):
-    """Version-independent swagger object"""
+    """Version-independent swagger object. Version-dependent processing is
+    defined in version-specific subclasses
+    """
 
     def __init__(self, swagger_data):
         """Constructor """
@@ -50,33 +48,86 @@ class Swagger(object):
         # First, call superclass constructor
         super(Swagger, self).__init__()
 
-        # Initialize
+        # Track the swagger data
         self.data = swagger_data
-        self.tosca = dict()
+
+        # Track types to avoid creating duplicates
+        self.node_types = set()
+        self.data_types = set()
+
+        # Track schemas from which to create data types
+        self.definitions = set()
+        
+
+    def convert(self, top):
+        """Convert a Swagger object to TOSCA type definitions and write
+        these definitions to profile directories under 'top'.
+
+        The conversion process works as follows:
+
+        1. Scan all the schemas defined in the swagger file, and
+           generate a set of 'TOSCA Profile Names' from the
+           corresponding schema names. For each profile, also track
+           the other profiles on which the profile depends
+           (e.g. because properties use schemas defined in other
+           profiles).
+
+        2. Scan all the “paths” in the swagger file to find those path
+           objects that include a POST operation (under the assumption
+           that those paths represent objects that can be
+           “instantiated”).
+
+        3. Create TOSCA Node Types based on the schemas used for the
+           payload in the POST operation.
+
+        4. For each property defined in those payload schemas, find
+           the corresponding schema in the swagger file that is used
+           as the “type” for that property, and create a corresponding
+           data type.
+
+        """
+        # Get the names of the profiles that need to be created and
+        # their dependencies on other profiles
+        self.get_profile_names()
+
+        # Create the directories within which each profile will be
+        # created.
+        self.initialize_profiles(top, self.get_info())
+
+        # Extract node types from 'path' objects
+        self.process_paths()
+
+        # Create data types based on 'definitions'
+        self.process_definitions()
+
+        # Clean up
+        self.finalize_profiles()
 
 
     def get_info(self):
-        """Process the (required) Info Object. This object provides metadata
+        """Retrieve the (required) Info Object. This object provides metadata
         about the API. The metadata can be used by the clients if
-        needed. A swagger 2 Info Object has the following properties:
+        needed. 
 
-        title(string): Required. The title of the application.
+        A swagger Info Object has the following properties:
 
-        description(string): A short description of the
-          application. GFM syntax can be used for rich text
-          representation.
+          title(string): Required. The title of the application.
 
-        termsOfService(string): The Terms of Service for the API.
+          description(string): A short description of the
+            application. GFM syntax can be used for rich text
+            representation.
 
-        contact(Contact Object): The contact information for the
-          exposed API.
+          termsOfService(string): The Terms of Service for the API.
 
-        license(License Object): The license information for the
-          exposed API.
+          contact(Contact Object): The contact information for the
+            exposed API.
 
-        version(string): Required Provides the version of the
-          application API (not to be confused with the specification
-          version)
+          license(License Object): The license information for the
+            exposed API.
+
+          version(string): Required Provides the version of the
+            application API (not to be confused with the specification
+            version)
 
         """
         return self.data['info']
@@ -86,10 +137,12 @@ class Swagger(object):
         for name, profile in self.profiles.items():
             profile.initialize(top, info)
         
+
     def finalize_profiles(self):
         for name, profile in self.profiles.items():
             profile.finalize()
         
+
     def process_paths(self):
         """Process the (required) Paths Object, which defines a list of
         available paths and associated operations for the API.

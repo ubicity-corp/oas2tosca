@@ -276,7 +276,7 @@ class Profile(object):
         will be handled separately for each type.
         """
 
-        lgger.info("Emit data type %s", kind)
+        logger.info("Emit data type %s", kind)
         
         # Do we have to write the header first?
         if not self.already_has_data_types:

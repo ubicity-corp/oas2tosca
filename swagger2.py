@@ -20,119 +20,79 @@ import profile as p
 # Text formatting
 import textwrap
 
+
 class Swagger2(swagger.Swagger):
+    """A Swagger 2 object has the following properties:
 
-    def convert(self, top):
-        """Convert a Swagger v2 object to TOSCA type definitions and write
-        these definitions to profile directories under 'top'.
+      swagger(string): Required. Specifies the Swagger Specification
+        version being used. It can be used by the Swagger UI and other
+        clients to interpret the API listing. The value MUST be "2.0".
 
-        A swagger 2 object is has the following properties:
+      info(Info Object): Required. Provides metadata about the
+        API. The metadata can be used by the clients if needed.
 
-        swagger(string): Required. Specifies the Swagger Specification
-          version being used. It can be used by the Swagger UI and
-          other clients to interpret the API listing. The value MUST
-          be "2.0".
+      host(string): The host (name or ip) serving the API. This MUST
+        be the host only and does not include the scheme nor
+        sub-paths. It MAY include a port. If the host is not included,
+        the host serving the documentation is to be used (including
+        the port). The host does not support path templating.
 
-        info(Info Object): Required. Provides metadata about the
-          API. The metadata can be used by the clients if needed.
+      basePath(string): The base path on which the API is served,
+        which is relative to the host. If it is not included, the API
+        is served directly under the host. The value MUST start with a
+        leading slash (/). The basePath does not support path
+        templating.
 
-        host(string): The host (name or ip) serving the API. This MUST
-          be the host only and does not include the scheme nor
-          sub-paths. It MAY include a port. If the host is not
-          included, the host serving the documentation is to be used
-          (including the port). The host does not support path
-          templating.
+      schemes([string]): The transfer protocol of the API. Values MUST
+        be from the list: "http", "https", "ws", "wss". If the schemes
+        is not included, the default scheme to be used is the one used
+        to access the Swagger definition itself.
 
-        basePath(string): The base path on which the API is served,
-          which is relative to the host. If it is not included, the
-          API is served directly under the host. The value MUST start
-          with a leading slash (/). The basePath does not support path
-          templating.
+      consumes([string]): A list of MIME types the APIs can
+        consume. This is global to all APIs but can be overridden on
+        specific API calls. Value MUST be as described under Mime
+        Types.
 
-        schemes([string]): The transfer protocol of the API. Values
-          MUST be from the list: "http", "https", "ws", "wss". If the
-          schemes is not included, the default scheme to be used is
-          the one used to access the Swagger definition itself.
+      produces([string]): A list of MIME types the APIs can
+        produce. This is global to all APIs but can be overridden on
+        specific API calls. Value MUST be as described under Mime
+        Types.
 
-        consumes([string]): A list of MIME types the APIs can
-          consume. This is global to all APIs but can be overridden on
-          specific API calls. Value MUST be as described under Mime
-          Types.
+      paths(Paths Object): Required. The available paths and
+        operations for the API.
 
-        produces([string]): A list of MIME types the APIs can
-          produce. This is global to all APIs but can be overridden on
-          specific API calls. Value MUST be as described under Mime
-          Types.
+      definitions(Definitions Object): An object to hold data types
+        produced and consumed by operations.
 
-        paths(Paths Object): Required. The available paths and
-          operations for the API.
+      parameters(Parameters Definitions Object): An object to hold
+        parameters that can be used across operations. This property
+        does not define global parameters for all operations.
 
-        definitions(Definitions Object): An object to hold data types
-          produced and consumed by operations.
+      responses(Responses Definitions Object): An object to hold
+        responses that can be used across operations. This property
+        does not define global responses for all operations.
 
-        parameters(Parameters Definitions Object): An object to hold
-          parameters that can be used across operations. This property
-          does not define global parameters for all operations.
+      securityDefinitions(Security Definitions Object): Security
+        scheme definitions that can be used across the specification.
 
-        responses(Responses Definitions Object): An object to hold
-          responses that can be used across operations. This property
-          does not define global responses for all operations.
+      security([Security Requirement Object]): A declaration of which
+        security schemes are applied for the API as a whole. The list
+        of values describes alternative security schemes that can be
+        used (that is, there is a logical OR between the security
+        requirements). Individual operations can override this
+        definition.
 
-        securityDefinitions(Security Definitions Object): Security
-          scheme definitions that can be used across the
-          specification.
+      tags([Tag Object]): A list of tags used by the specification
+        with additional metadata. The order of the tags can be used to
+        reflect on their order by the parsing tools. Not all tags that
+        are used by the Operation Object must be declared. The tags
+        that are not declared may be organized randomly or based on
+        the tools' logic. Each tag name in the list MUST be unique.
 
-        security([Security Requirement Object]): A declaration of
-          which security schemes are applied for the API as a
-          whole. The list of values describes alternative security
-          schemes that can be used (that is, there is a logical OR
-          between the security requirements). Individual operations
-          can override this definition.
+      externalDocs(External Documentation Object): Additional external
+        documentation.
 
-        tags([Tag Object]): A list of tags used by the specification
-          with additional metadata. The order of the tags can be used
-          to reflect on their order by the parsing tools. Not all tags
-          that are used by the Operation Object must be declared. The
-          tags that are not declared may be organized randomly or
-          based on the tools' logic. Each tag name in the list MUST be
-          unique.
-
-        externalDocs(External Documentation Object): Additional
-          external documentation.
-
-        """
-        # Track types to avoid creating duplicates
-        self.node_types = set()
-        self.data_types = set()
-
-        # Track definitions from which to create data types
-        self.definitions = set()
-        
-        # Get the names of the profiles that need to be created and
-        # their dependencies on other profiles
-        self.get_profile_names()
-
-        # Create the directories within which each profile will be
-        # created.
-        self.initialize_profiles(top, self.get_info())
-
-        # Extract node types from 'path' objects
-        self.process_paths()
-
-        # Create data types based on 'definitions'
-        self.process_definitions()
-
-        self.finalize_profiles()
-
-        """
-        # Are any of these needed?
-        self.process_parameters()
-        self.process_responses()
-        self.process_securityDefinitions()
-        self.process_security()
-        self.process_tags()
-        self.process_externalDocs()
-        """
+    """
 
     def get_profile_names(self):
         """Scan the 'definitions' section of the Swagger object and parse out
