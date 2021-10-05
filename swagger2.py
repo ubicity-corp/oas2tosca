@@ -94,29 +94,6 @@ class Swagger2(swagger.Swagger):
 
     """
 
-    def get_profile_names(self):
-        """Scan the 'definitions' section of the Swagger object and parse out
-        the 'group' section of each schema definition. We will use
-        that group name as the profile name. For each schema, we also
-        find the schemas used in property definitions. The group names
-        of those schemas determine other profiles on which each
-        profile depends
-        """
-
-        self.profiles = dict()
-
-        # Make sure this swagger file has definitions
-        try:
-            definitions = self.data['definitions']
-        except KeyError:
-            logger.debug("No Definitions")
-            return
-
-        # Process each schema definition
-        for schema_name, schema in definitions.items():
-            self.get_profile_names_from_schema(schema_name, schema)
-
-
     def get_profile_names_from_schema(self, schema_name, schema):
         # Extract the group name from the schema name. This group name
         # will be used as the profile name.

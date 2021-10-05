@@ -78,27 +78,6 @@ class Swagger3(swagger.Swagger):
             return dict()
 
 
-    def get_profile_names(self):
-        """Scan the 'components' section of the Swagger object to find the
-        supported 'schemas'. For each schema definition, find the
-        'x-swagger-router-model' keyword and split it into a profile
-        name and resource name.
-        """
-
-        self.profiles = dict()
-
-        # Make sure this swagger file has schemas
-        try:
-            schemas = self.data['components']['schemas']
-        except KeyError:
-            logger.debug("No Schemas")
-            return
-
-        # Process each schema definition
-        for name, schema in schemas.items():
-            self.get_profile_names_from_schema(name, schema)
-
-
     def get_profile_names_from_schema(self, name, schema):
         """Find profile names in a schema definition"""
         

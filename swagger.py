@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 import sys
 
 def get_version(data):
-    """Return the version of the OpenAPI/Swagger data
+    """Return the version of the OpenAPI/Swagger data. TODO: return
+    semantic version components.
 
     Args:
       data(dict): OpenAPI document
@@ -102,6 +103,25 @@ class Swagger(object):
 
         # Clean up
         self.finalize_profiles()
+
+
+    def get_profile_names(self):
+        """For each schema defined in the Swagger object, parse the schema
+        name into a 'profile' name and a 'resource' name. We use these
+        profile names to generate the set of profiles that need to be
+        created.  For each schema, we also find the schemas used in
+        property definitions. The 'profile' parts of those schema
+        names determine other profiles on which each profile depends
+        """
+
+        self.profiles = dict()
+
+        # Get the set of schema definitions
+        definitions = self.get_definitions()
+
+        # Process each schema definition
+        for schema_name, schema in definitions.items():
+            self.get_profile_names_from_schema(schema_name, schema)
 
 
     def get_info(self):
