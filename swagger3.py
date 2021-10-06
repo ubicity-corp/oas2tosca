@@ -345,29 +345,6 @@ class Swagger3(swagger.Swagger):
         self.create_node_type_from_schema(schema_name, schema)
 
             
-    def get_referenced_schema(self, ref):
-        # Only support local references for now
-        try:
-            if ref[0] != '#':
-                logger.error("%s: not a local reference", ref)
-                return None
-        except Exception as e:
-            logger.error("%s: not a ref (%s)", str(ref), str(e))
-            return None
-        # Make sure we reference a schema
-        prefix = "#/components/schemas/"
-        if not ref.startswith(prefix):
-            return None
-
-        # Strip prefix
-        schema_name = ref[len(prefix):]
-        try:
-            return self.data['components']['schemas'][schema_name]
-        except KeyError:
-            logger.error("%s: not a ref to a schema", ref)
-            return None
-
-
     def plan_data_types_for_properties(self, schema):
         """Plan the creation of a data type for schemas referenced in this
         schema
@@ -385,7 +362,6 @@ class Swagger3(swagger.Swagger):
                 # No type specified. Use $ref instead
                 ref = property_value['$ref']
                 schema_ref = self.get_ref(ref)
-                property_schema = self.get_referenced_schema(ref)
                 self.definitions.add(schema_ref)
             except KeyError:
                 # Property schema does not contain a $ref. Items

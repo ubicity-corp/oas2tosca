@@ -366,27 +366,53 @@ class Swagger(object):
         # Do any properties reference schemas?
         for property_name, property_schema in properties.items():
             try:
-                schema_name = self.get_ref(property_schema['$ref'])
-                self.create_data_type_from_schema(schema_name,
-                                                  self.data['definitions'][schema_name])
+                ref = property_schema['$ref']
+                schema_name = self.get_ref(ref)
+                schema = self.get_referenced_schema(ref)
+                self.create_data_type_from_schema(schema_name, schema)
             except KeyError:
                 # Property schema does not contain a $ref. Items
                 # perhaps?
                 try:
                     items = property_schema['items']
-                    schema_name = self.get_ref(items['$ref'])
-                    self.create_data_type_from_schema(schema_name,
-                                                      self.data['definitions'][schema_name])
+                    ref = items['$ref']
+                    schema_name = self.get_ref(ref)
+                    schema = self.get_referenced_schema(ref)
+                    self.create_data_type_from_schema(schema_name, schema)
                 except KeyError:
                     try:
                         additionalProperties = property_schema['additionalProperties']
-                        schema_name = self.get_ref(additionalProperties['$ref'])
-                        self.create_data_type_from_schema(schema_name,
-                                                          self.data['definitions'][schema_name])
+                        ref = additionalProperties['$ref']
+                        schema_name = self.get_ref(ref)
+                        schema = self.get_referenced_schema(ref)
+                        self.create_data_type_from_schema(schema_name, schema)
                     except KeyError:
                         # No additional schemas
                         pass
                     pass
+
+
+    def get_referenced_schema(self, ref):
+        """Return the schema referenced by the 'ref' URL."""
+
+        # Split into components
+        split = ref.split('/')
+        length = len(split)
+
+        # Only support local references for now
+        if split[0] != "#":
+            logger.error("%s: not a local reference", ref)
+            return None
+
+        # Navigate to the referenced entity. 
+        referenced = self.data
+        i = 1
+        while i < length:
+            referenced = referenced[split[i]]
+            i = i+1
+
+        # All done
+        return referenced
 
 
     def parse_schema_name(self, schema_name, schema):
