@@ -117,26 +117,6 @@ node_types:
 
 data_types:
 
-  CronJobStatus:
-    description: CronJobStatus represents the current state of a cron job.
-    properties:
-      active:
-        description: A list of pointers to currently running jobs.
-        required: false
-        type: list
-        entry_schema:
-          type: core:ObjectReference
-        metadata:
-          x-kubernetes-list-type: atomic
-      lastScheduleTime:
-        description: Information when was the last time the job was successfully scheduled.
-        required: false
-        type: meta:Time
-      lastSuccessfulTime:
-        description: Information when was the last time the job successfully completed.
-        required: false
-        type: meta:Time
-
   JobSpec:
     description: JobSpec describes how the job execution will look like.
     properties:
@@ -247,6 +227,26 @@ data_types:
         type: integer
         constraints:
           - in_range: [-2147483648, 2147483647]
+
+  CronJobStatus:
+    description: CronJobStatus represents the current state of a cron job.
+    properties:
+      active:
+        description: A list of pointers to currently running jobs.
+        required: false
+        type: list
+        entry_schema:
+          type: core:ObjectReference
+        metadata:
+          x-kubernetes-list-type: atomic
+      lastScheduleTime:
+        description: Information when was the last time the job was successfully scheduled.
+        required: false
+        type: meta:Time
+      lastSuccessfulTime:
+        description: Information when was the last time the job successfully completed.
+        required: false
+        type: meta:Time
 
   JobTemplateSpec:
     description: >-

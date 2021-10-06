@@ -326,6 +326,35 @@ data_types:
         required: false
         type: string
 
+  SelfSubjectRulesReviewSpec:
+    description: >-
+      SelfSubjectRulesReviewSpec defines the specification for
+      SelfSubjectRulesReview.
+    properties:
+      namespace:
+        description: Namespace to evaluate rules for. Required.
+        required: false
+        type: string
+
+  SelfSubjectAccessReviewSpec:
+    description: >-
+      SelfSubjectAccessReviewSpec is a description of the access request.
+      Exactly one of ResourceAuthorizationAttributes and
+      NonResourceAuthorizationAttributes must be set
+    properties:
+      nonResourceAttributes:
+        description: >-
+          NonResourceAttributes describes information for a non-resource access
+          request
+        required: false
+        type: NonResourceAttributes
+      resourceAttributes:
+        description: >-
+          ResourceAuthorizationAttributes describes information for a resource
+          access request
+        required: false
+        type: ResourceAttributes
+
   SubjectAccessReviewStatus:
     description: SubjectAccessReviewStatus
     properties:
@@ -463,33 +492,4 @@ data_types:
         type: list
         entry_schema:
           type: ResourceRule
-
-  SelfSubjectAccessReviewSpec:
-    description: >-
-      SelfSubjectAccessReviewSpec is a description of the access request.
-      Exactly one of ResourceAuthorizationAttributes and
-      NonResourceAuthorizationAttributes must be set
-    properties:
-      nonResourceAttributes:
-        description: >-
-          NonResourceAttributes describes information for a non-resource access
-          request
-        required: false
-        type: NonResourceAttributes
-      resourceAttributes:
-        description: >-
-          ResourceAuthorizationAttributes describes information for a resource
-          access request
-        required: false
-        type: ResourceAttributes
-
-  SelfSubjectRulesReviewSpec:
-    description: >-
-      SelfSubjectRulesReviewSpec defines the specification for
-      SelfSubjectRulesReview.
-    properties:
-      namespace:
-        description: Namespace to evaluate rules for. Required.
-        required: false
-        type: string
 

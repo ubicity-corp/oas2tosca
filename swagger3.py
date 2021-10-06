@@ -70,63 +70,6 @@ class Swagger3(swagger.Swagger):
             return dict()
 
 
-    def get_profile_names_from_schema(self, schema_name, schema):
-        """Find profile names in a schema definition"""
-        
-        # Extract the profile name from the schema name.
-        profile_name, version, resource, prefix = self.parse_schema_name(schema_name, schema)
-        if not profile_name:
-            return
-        
-        # Get profile object
-        try:
-            profile = self.profiles[profile_name]
-        except KeyError:
-            profile = p.Profile(profile_name, "", prefix)
-            self.profiles[profile_name] = profile
-
-        # Schemas are referenced by property definitions
-        try:
-            properties = schema['properties']
-        except KeyError:
-            # No properties
-            return
-
-        # Do any properties reference schemas?
-        for property_name, property_value in properties.items():
-            try:
-                # No type specified. Use $ref instead
-                ref = property_value['$ref']
-                schema_ref = self.get_ref(ref)
-                property_schema = self.get_referenced_schema(ref)
-                property_profile, version, property_resource, prefix = self.parse_schema_name(schema_ref, property_schema)
-                if property_profile and property_profile != property_name:
-                    profile.add_dependency(property_profile, prefix)
-            except KeyError:
-                # Property schema does not contain a $ref. Items
-                # perhaps?
-                try:
-                    items = property_value['items']
-                    ref = items['$ref']
-                    schema_ref = self.get_ref(ref)
-                    property_schema = self.get_referenced_schema(ref)
-                    property_profile, version, property_resource, prefix = self.parse_schema_name(schema_ref, property_schema)
-                    if property_profile and property_profile != property_name:
-                        profile.add_dependency(property_profile, prefix)
-                except KeyError:
-                    # No items either. additionalProperties?
-                    try:
-                        additionalProperties = property_value['additionalProperties']
-                        ref = additionalProperties['$ref']
-                        schema_ref = self.get_ref(ref)
-                        property_schema = self.get_referenced_schema(ref)
-                        property_profile, version, property_resource, prefix = self.parse_schema_name(schema_ref, property_schema)
-                        if property_profile and property_profile != property_name:
-                            profile.add_dependency(property_profile, prefix)
-                    except KeyError:
-                        pass
-        
-
     def process_parameter_object(self, name, value):
         """A Parameter Object in Swagger has the following fixed fields:
 

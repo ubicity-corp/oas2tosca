@@ -14,9 +14,6 @@ logger = logging.getLogger(__name__)
 # System support
 import swagger
 
-# Profiles
-import profile as p
-
 # Text formatting
 import textwrap
 
@@ -79,62 +76,6 @@ class Swagger2(swagger.Swagger):
         documentation.
     """
 
-    def get_profile_names_from_schema(self, schema_name, schema):
-        # Extract the group name from the schema name. This group name
-        # will be used as the profile name.
-        group, version, kind, prefix = self.parse_schema_name(schema_name, schema)
-        if not group:
-            logger.error("%s: no group", schema_name)
-            return
-
-        # We only handle 'v1' schemas for now
-        if version and version != "v1":
-            logger.debug("Ignoring %s", schema_name)
-            return
-
-        # Get profile object
-        try:
-            profile = self.profiles[group]
-        except KeyError:
-            profile = p.Profile(group, version, prefix)
-            self.profiles[group] = profile
-
-        # Schemas are referenced by property definitions
-        try:
-            properties = schema['properties']
-        except KeyError:
-            # No properties
-            return
-
-        # Do any properties reference schemas?
-        for property_name, property_value in properties.items():
-            try:
-                # No type specified. Use $ref instead
-                property_type = self.get_ref(property_value['$ref'])
-                property_group, version, kind, prefix = self.parse_schema_name(property_type, schema)
-                if group != property_group:
-                    profile.add_dependency(property_group, prefix)
-            except KeyError:
-                # Property schema does not contain a $ref. Items
-                # perhaps?
-                try:
-                    items = property_value['items']
-                    property_type = self.get_ref(items['$ref'])
-                    property_group, version, kind, prefix = self.parse_schema_name(property_type, schema)
-                    if group != property_group:
-                        profile.add_dependency(property_group, prefix)
-                except KeyError:
-                    # No items either. additionalProperties?
-                    try:
-                        additionalProperties = property_value['additionalProperties']
-                        property_type = self.get_ref(additionalProperties['$ref'])
-                        property_group, version, kind, prefix = self.parse_schema_name(property_type, schema)
-                        if group != property_group:
-                            profile.add_dependency(property_group, prefix)
-                    except KeyError:
-                        pass
-
-    
     def get_definitions(self):
         try:
             return self.data['definitions']
