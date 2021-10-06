@@ -221,6 +221,47 @@ node_types:
 
 data_types:
 
+  SubjectAccessReviewStatus:
+    description: SubjectAccessReviewStatus
+    properties:
+      allowed:
+        description: >-
+          Allowed is required. True if the action would be allowed, false
+          otherwise.
+        required: true
+        type: boolean
+      denied:
+        description: >-
+          Denied is optional. True if the action would be denied, otherwise
+          false. If both allowed is false and denied is false, then the
+          authorizer has no opinion on whether to authorize the action. Denied
+          may not be true if Allowed is true.
+        required: false
+        type: boolean
+      evaluationError:
+        description: >-
+          EvaluationError is an indication that some error occurred during the
+          authorization check. It is entirely possible to get an error and be
+          able to continue determine authorization status in spite of it. For
+          instance, RBAC can be missing a role, but enough roles are still
+          present and bound to reason about the request.
+        required: false
+        type: string
+      reason:
+        description: Reason is optional.  It indicates why a request was allowed or denied.
+        required: false
+        type: string
+
+  SelfSubjectRulesReviewSpec:
+    description: >-
+      SelfSubjectRulesReviewSpec defines the specification for
+      SelfSubjectRulesReview.
+    properties:
+      namespace:
+        description: Namespace to evaluate rules for. Required.
+        required: false
+        type: string
+
   NonResourceAttributes:
     description: >-
       NonResourceAttributes includes the authorization attributes available
@@ -323,66 +364,6 @@ data_types:
           User is the user you're testing for. If you specify "User" but not
           "Groups", then is it interpreted as "What if User were not a member of
           any groups
-        required: false
-        type: string
-
-  SelfSubjectRulesReviewSpec:
-    description: >-
-      SelfSubjectRulesReviewSpec defines the specification for
-      SelfSubjectRulesReview.
-    properties:
-      namespace:
-        description: Namespace to evaluate rules for. Required.
-        required: false
-        type: string
-
-  SelfSubjectAccessReviewSpec:
-    description: >-
-      SelfSubjectAccessReviewSpec is a description of the access request.
-      Exactly one of ResourceAuthorizationAttributes and
-      NonResourceAuthorizationAttributes must be set
-    properties:
-      nonResourceAttributes:
-        description: >-
-          NonResourceAttributes describes information for a non-resource access
-          request
-        required: false
-        type: NonResourceAttributes
-      resourceAttributes:
-        description: >-
-          ResourceAuthorizationAttributes describes information for a resource
-          access request
-        required: false
-        type: ResourceAttributes
-
-  SubjectAccessReviewStatus:
-    description: SubjectAccessReviewStatus
-    properties:
-      allowed:
-        description: >-
-          Allowed is required. True if the action would be allowed, false
-          otherwise.
-        required: true
-        type: boolean
-      denied:
-        description: >-
-          Denied is optional. True if the action would be denied, otherwise
-          false. If both allowed is false and denied is false, then the
-          authorizer has no opinion on whether to authorize the action. Denied
-          may not be true if Allowed is true.
-        required: false
-        type: boolean
-      evaluationError:
-        description: >-
-          EvaluationError is an indication that some error occurred during the
-          authorization check. It is entirely possible to get an error and be
-          able to continue determine authorization status in spite of it. For
-          instance, RBAC can be missing a role, but enough roles are still
-          present and bound to reason about the request.
-        required: false
-        type: string
-      reason:
-        description: Reason is optional.  It indicates why a request was allowed or denied.
         required: false
         type: string
 
@@ -492,4 +473,23 @@ data_types:
         type: list
         entry_schema:
           type: ResourceRule
+
+  SelfSubjectAccessReviewSpec:
+    description: >-
+      SelfSubjectAccessReviewSpec is a description of the access request.
+      Exactly one of ResourceAuthorizationAttributes and
+      NonResourceAuthorizationAttributes must be set
+    properties:
+      nonResourceAttributes:
+        description: >-
+          NonResourceAttributes describes information for a non-resource access
+          request
+        required: false
+        type: NonResourceAttributes
+      resourceAttributes:
+        description: >-
+          ResourceAuthorizationAttributes describes information for a resource
+          access request
+        required: false
+        type: ResourceAttributes
 

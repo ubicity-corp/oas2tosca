@@ -93,7 +93,7 @@ class Swagger(object):
         """
         # Get the names of the profiles that need to be created and
         # their dependencies on other profiles
-        self.get_profile_names()
+        self.collect_profile_info()
 
         # Create the directories within which each profile will be
         # created.
@@ -109,7 +109,7 @@ class Swagger(object):
         self.finalize_profiles()
 
 
-    def get_profile_names(self):
+    def collect_profile_info(self):
         """For each schema defined in the Swagger object, parse the schema
         name into a 'profile' name and a 'resource' name. We use these
         profile names to generate the set of profiles that need to be
@@ -125,10 +125,10 @@ class Swagger(object):
 
         # Process each schema definition
         for schema_name, schema in definitions.items():
-            self.get_profile_names_from_schema(schema_name, schema)
+            self.collect_profile_info_from_schema(schema_name, schema)
 
 
-    def get_profile_names_from_schema(self, schema_name, schema):
+    def collect_profile_info_from_schema(self, schema_name, schema):
         """Find profile names in a schema definition"""
         
         # Extract the profile name from the schema name.

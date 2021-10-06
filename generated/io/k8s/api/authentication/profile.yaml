@@ -128,6 +128,18 @@ data_types:
         required: false
         type: string
 
+  TokenRequestStatus:
+    description: TokenRequestStatus is the result of a token request.
+    properties:
+      expirationTimestamp:
+        description: ExpirationTimestamp is the time of expiration of the returned token.
+        required: true
+        type: meta:Time
+      token:
+        description: Token is the opaque bearer token.
+        required: true
+        type: string
+
   BoundObjectReference:
     description: >-
       BoundObjectReference is a reference to an object that a token is bound
@@ -187,18 +199,6 @@ data_types:
         type: integer
         constraints:
           - in_range: [-9223372036854775808, 9223372036854775807]
-
-  TokenRequestStatus:
-    description: TokenRequestStatus is the result of a token request.
-    properties:
-      expirationTimestamp:
-        description: ExpirationTimestamp is the time of expiration of the returned token.
-        required: true
-        type: meta:Time
-      token:
-        description: Token is the opaque bearer token.
-        required: true
-        type: string
 
   UserInfo:
     description: >-
