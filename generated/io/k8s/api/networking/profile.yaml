@@ -421,14 +421,6 @@ data_types:
         required: false
         type: IngressClassParametersReference
 
-  IngressStatus:
-    description: IngressStatus describe the current state of the Ingress.
-    properties:
-      loadBalancer:
-        description: LoadBalancer contains the current status of the load-balancer.
-        required: false
-        type: core:LoadBalancerStatus
-
   NetworkPolicyPort:
     description: NetworkPolicyPort describes a port to allow traffic on
     properties:
@@ -628,4 +620,12 @@ data_types:
         type: list
         entry_schema:
           type: string
+
+  IngressStatus:
+    description: IngressStatus describe the current state of the Ingress.
+    properties:
+      loadBalancer:
+        description: LoadBalancer contains the current status of the load-balancer.
+        required: false
+        type: core:LoadBalancerStatus
 

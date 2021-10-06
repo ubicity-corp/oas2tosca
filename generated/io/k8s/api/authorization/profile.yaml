@@ -221,6 +221,142 @@ node_types:
 
 data_types:
 
+  NonResourceAttributes:
+    description: >-
+      NonResourceAttributes includes the authorization attributes available
+      for non-resource requests to the Authorizer interface
+    properties:
+      path:
+        description: Path is the URL path of the request
+        required: false
+        type: string
+      verb:
+        description: Verb is the standard HTTP verb
+        required: false
+        type: string
+
+  ResourceAttributes:
+    description: >-
+      ResourceAttributes includes the authorization attributes available for
+      resource requests to the Authorizer interface
+    properties:
+      group:
+        description: Group is the API Group of the Resource.  "*" means all.
+        required: false
+        type: string
+      name:
+        description: >-
+          Name is the name of the resource being requested for a "get" or
+          deleted for a "delete". "" (empty) means all.
+        required: false
+        type: string
+      namespace:
+        description: >-
+          Namespace is the namespace of the action being requested.  Currently,
+          there is no distinction between no namespace and all namespaces ""
+          (empty) is defaulted for LocalSubjectAccessReviews "" (empty) is empty
+          for cluster-scoped resources "" (empty) means "all" for namespace
+          scoped resources from a SubjectAccessReview or SelfSubjectAccessReview
+        required: false
+        type: string
+      resource:
+        description: Resource is one of the existing resource types.  "*" means all.
+        required: false
+        type: string
+      subresource:
+        description: Subresource is one of the existing resource types.  "" means none.
+        required: false
+        type: string
+      verb:
+        description: >-
+          Verb is a kubernetes resource API verb, like: get, list, watch,
+          create, update, delete, proxy.  "*" means all.
+        required: false
+        type: string
+      version:
+        description: Version is the API Version of the Resource.  "*" means all.
+        required: false
+        type: string
+
+  SubjectAccessReviewSpec:
+    description: >-
+      SubjectAccessReviewSpec is a description of the access request.
+      Exactly one of ResourceAuthorizationAttributes and
+      NonResourceAuthorizationAttributes must be set
+    properties:
+      extra:
+        description: >-
+          Extra corresponds to the user.Info.GetExtra() method from the
+          authenticator.  Since that is input to the authorizer it needs a
+          reflection here.
+        required: false
+        type: map
+        entry_schema:
+          type: list
+          entry_schema:
+            type: string
+      groups:
+        description: >-
+          Groups is the groups you're testing for.
+        required: false
+        type: list
+        entry_schema:
+          type: string
+      nonResourceAttributes:
+        description: >-
+          NonResourceAttributes describes information for a non-resource access
+          request
+        required: false
+        type: NonResourceAttributes
+      resourceAttributes:
+        description: >-
+          ResourceAuthorizationAttributes describes information for a resource
+          access request
+        required: false
+        type: ResourceAttributes
+      uid:
+        description: UID information about the requesting user.
+        required: false
+        type: string
+      user:
+        description: >-
+          User is the user you're testing for. If you specify "User" but not
+          "Groups", then is it interpreted as "What if User were not a member of
+          any groups
+        required: false
+        type: string
+
+  SubjectAccessReviewStatus:
+    description: SubjectAccessReviewStatus
+    properties:
+      allowed:
+        description: >-
+          Allowed is required. True if the action would be allowed, false
+          otherwise.
+        required: true
+        type: boolean
+      denied:
+        description: >-
+          Denied is optional. True if the action would be denied, otherwise
+          false. If both allowed is false and denied is false, then the
+          authorizer has no opinion on whether to authorize the action. Denied
+          may not be true if Allowed is true.
+        required: false
+        type: boolean
+      evaluationError:
+        description: >-
+          EvaluationError is an indication that some error occurred during the
+          authorization check. It is entirely possible to get an error and be
+          able to continue determine authorization status in spite of it. For
+          instance, RBAC can be missing a role, but enough roles are still
+          present and bound to reason about the request.
+        required: false
+        type: string
+      reason:
+        description: Reason is optional.  It indicates why a request was allowed or denied.
+        required: false
+        type: string
+
   NonResourceRule:
     description: >-
       NonResourceRule holds information that describes a rule for the non-
@@ -327,142 +463,6 @@ data_types:
         type: list
         entry_schema:
           type: ResourceRule
-
-  SubjectAccessReviewStatus:
-    description: SubjectAccessReviewStatus
-    properties:
-      allowed:
-        description: >-
-          Allowed is required. True if the action would be allowed, false
-          otherwise.
-        required: true
-        type: boolean
-      denied:
-        description: >-
-          Denied is optional. True if the action would be denied, otherwise
-          false. If both allowed is false and denied is false, then the
-          authorizer has no opinion on whether to authorize the action. Denied
-          may not be true if Allowed is true.
-        required: false
-        type: boolean
-      evaluationError:
-        description: >-
-          EvaluationError is an indication that some error occurred during the
-          authorization check. It is entirely possible to get an error and be
-          able to continue determine authorization status in spite of it. For
-          instance, RBAC can be missing a role, but enough roles are still
-          present and bound to reason about the request.
-        required: false
-        type: string
-      reason:
-        description: Reason is optional.  It indicates why a request was allowed or denied.
-        required: false
-        type: string
-
-  NonResourceAttributes:
-    description: >-
-      NonResourceAttributes includes the authorization attributes available
-      for non-resource requests to the Authorizer interface
-    properties:
-      path:
-        description: Path is the URL path of the request
-        required: false
-        type: string
-      verb:
-        description: Verb is the standard HTTP verb
-        required: false
-        type: string
-
-  ResourceAttributes:
-    description: >-
-      ResourceAttributes includes the authorization attributes available for
-      resource requests to the Authorizer interface
-    properties:
-      group:
-        description: Group is the API Group of the Resource.  "*" means all.
-        required: false
-        type: string
-      name:
-        description: >-
-          Name is the name of the resource being requested for a "get" or
-          deleted for a "delete". "" (empty) means all.
-        required: false
-        type: string
-      namespace:
-        description: >-
-          Namespace is the namespace of the action being requested.  Currently,
-          there is no distinction between no namespace and all namespaces ""
-          (empty) is defaulted for LocalSubjectAccessReviews "" (empty) is empty
-          for cluster-scoped resources "" (empty) means "all" for namespace
-          scoped resources from a SubjectAccessReview or SelfSubjectAccessReview
-        required: false
-        type: string
-      resource:
-        description: Resource is one of the existing resource types.  "*" means all.
-        required: false
-        type: string
-      subresource:
-        description: Subresource is one of the existing resource types.  "" means none.
-        required: false
-        type: string
-      verb:
-        description: >-
-          Verb is a kubernetes resource API verb, like: get, list, watch,
-          create, update, delete, proxy.  "*" means all.
-        required: false
-        type: string
-      version:
-        description: Version is the API Version of the Resource.  "*" means all.
-        required: false
-        type: string
-
-  SubjectAccessReviewSpec:
-    description: >-
-      SubjectAccessReviewSpec is a description of the access request.
-      Exactly one of ResourceAuthorizationAttributes and
-      NonResourceAuthorizationAttributes must be set
-    properties:
-      extra:
-        description: >-
-          Extra corresponds to the user.Info.GetExtra() method from the
-          authenticator.  Since that is input to the authorizer it needs a
-          reflection here.
-        required: false
-        type: map
-        entry_schema:
-          type: list
-          entry_schema:
-            type: string
-      groups:
-        description: >-
-          Groups is the groups you're testing for.
-        required: false
-        type: list
-        entry_schema:
-          type: string
-      nonResourceAttributes:
-        description: >-
-          NonResourceAttributes describes information for a non-resource access
-          request
-        required: false
-        type: NonResourceAttributes
-      resourceAttributes:
-        description: >-
-          ResourceAuthorizationAttributes describes information for a resource
-          access request
-        required: false
-        type: ResourceAttributes
-      uid:
-        description: UID information about the requesting user.
-        required: false
-        type: string
-      user:
-        description: >-
-          User is the user you're testing for. If you specify "User" but not
-          "Groups", then is it interpreted as "What if User were not a member of
-          any groups
-        required: false
-        type: string
 
   SelfSubjectAccessReviewSpec:
     description: >-
