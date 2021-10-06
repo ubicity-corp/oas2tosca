@@ -296,6 +296,56 @@ data_types:
         required: true
         type: VolumeAttachmentSource
 
+  VolumeError:
+    description: VolumeError captures an error encountered during a volume operation.
+    properties:
+      message:
+        description: >-
+          String detailing the error encountered during Attach or Detach
+          operation. This string may be logged, so it should not contain
+          sensitive information.
+        required: false
+        type: string
+      time:
+        description: Time the error was encountered.
+        required: false
+        type: meta:Time
+
+  VolumeAttachmentStatus:
+    description: VolumeAttachmentStatus is the status of a VolumeAttachment request.
+    properties:
+      attachError:
+        description: >-
+          The last error encountered during attach operation, if any. This field
+          must only be set by the entity completing the attach operation, i.e.
+          the external-attacher.
+        required: false
+        type: VolumeError
+      attached:
+        description: >-
+          Indicates the volume is successfully attached. This field must only be
+          set by the entity completing the attach operation, i.e. the external-
+          attacher.
+        required: true
+        type: boolean
+      attachmentMetadata:
+        description: >-
+          Upon successful attach, this field is populated with any information
+          returned by the attach operation that must be passed into subsequent
+          WaitForAttach or Mount calls. This field must only be set by the
+          entity completing the attach operation, i.e. the external-attacher.
+        required: false
+        type: map
+        entry_schema:
+          type: string
+      detachError:
+        description: >-
+          The last error encountered during detach operation, if any. This field
+          must only be set by the entity completing the detach operation, i.e.
+          the external-attacher.
+        required: false
+        type: VolumeError
+
   TokenRequest:
     description: TokenRequest contains parameters of a service account token.
     properties:
@@ -392,56 +442,6 @@ data_types:
           type: string
         metadata:
           x-kubernetes-list-type: set
-
-  VolumeError:
-    description: VolumeError captures an error encountered during a volume operation.
-    properties:
-      message:
-        description: >-
-          String detailing the error encountered during Attach or Detach
-          operation. This string may be logged, so it should not contain
-          sensitive information.
-        required: false
-        type: string
-      time:
-        description: Time the error was encountered.
-        required: false
-        type: meta:Time
-
-  VolumeAttachmentStatus:
-    description: VolumeAttachmentStatus is the status of a VolumeAttachment request.
-    properties:
-      attachError:
-        description: >-
-          The last error encountered during attach operation, if any. This field
-          must only be set by the entity completing the attach operation, i.e.
-          the external-attacher.
-        required: false
-        type: VolumeError
-      attached:
-        description: >-
-          Indicates the volume is successfully attached. This field must only be
-          set by the entity completing the attach operation, i.e. the external-
-          attacher.
-        required: true
-        type: boolean
-      attachmentMetadata:
-        description: >-
-          Upon successful attach, this field is populated with any information
-          returned by the attach operation that must be passed into subsequent
-          WaitForAttach or Mount calls. This field must only be set by the
-          entity completing the attach operation, i.e. the external-attacher.
-        required: false
-        type: map
-        entry_schema:
-          type: string
-      detachError:
-        description: >-
-          The last error encountered during detach operation, if any. This field
-          must only be set by the entity completing the detach operation, i.e.
-          the external-attacher.
-        required: false
-        type: VolumeError
 
   VolumeNodeResources:
     description: >-

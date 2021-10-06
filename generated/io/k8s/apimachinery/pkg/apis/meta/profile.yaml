@@ -282,9 +282,6 @@ data_types:
         required: false
         type: string
 
-  MicroTime:
-    description: MicroTime is version of Time with microsecond level precision.
-    derived_from: string
   LabelSelectorRequirement:
     description: >-
       A label selector requirement is a selector that contains values, a
@@ -336,6 +333,9 @@ data_types:
         entry_schema:
           type: string
 
+  MicroTime:
+    description: MicroTime is version of Time with microsecond level precision.
+    derived_from: string
   Preconditions:
     description: >-
       Preconditions must be fulfilled before an operation (update, delete,

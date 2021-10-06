@@ -89,6 +89,20 @@ node_types:
 
 data_types:
 
+  Overhead:
+    description: >-
+      Overhead structure represents the resource overhead associated with
+      running a pod.
+    properties:
+      podFixed:
+        description: >-
+          PodFixed represents the fixed resource overhead associated with
+          running a pod.
+        required: false
+        type: map
+        entry_schema:
+          type: resource:Quantity
+
   Scheduling:
     description: >-
       Scheduling specifies the scheduling constraints for nodes supporting a
@@ -116,18 +130,4 @@ data_types:
           type: core:Toleration
         metadata:
           x-kubernetes-list-type: atomic
-
-  Overhead:
-    description: >-
-      Overhead structure represents the resource overhead associated with
-      running a pod.
-    properties:
-      podFixed:
-        description: >-
-          PodFixed represents the fixed resource overhead associated with
-          running a pod.
-        required: false
-        type: map
-        entry_schema:
-          type: resource:Quantity
 
