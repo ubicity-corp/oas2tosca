@@ -269,40 +269,5 @@ class Swagger3(swagger.Swagger):
         # reference another schema (in which case all other properties
         # in this schema object must be ignored according to the
         # JSONSchema spec)
-        media_type_schema = media_type['schema']
-        try:
-            ref = media_type_schema['$ref']
-        except KeyError:
-            logger.error("%s: creating node type from in-place schema not implemented",
-                         name)
-            return
-        
-        # Find the referenced schema:
-        (schema_name, schema) = self.get_referenced_schema(ref)
-        if not schema:
-            logger.info("%s: referenced schema not found", name)
-            return
-
-        logger.info("%s: creating node type for %s", name, schema_name)
-        self.create_node_type_from_schema(schema_name, schema)
-
-            
-    def get_ref(self, ref):
-        # Only support local references for now
-        try:
-            if ref[0] != '#':
-                logger.error("%s: not a local reference", ref)
-                return
-        except Exception as e:
-            logger.error("%s: not a ref (%s)", str(ref), str(e))
-            return
-        # Make sure we reference a schema component
-        prefix = "#/components/schemas/"
-        if ref.startswith(prefix):
-            # Strip prefix
-            return ref[len(prefix):]
-        else:
-            logger.error("%s: not a ref to a schema", ref)
-            return ref
-        
-
+        schema = media_type['schema']
+        self.create_node_type_from_schema_reference(name, schema)

@@ -304,6 +304,26 @@ class Swagger(object):
         self.process_operation_object(name, post)
 
         
+    def create_node_type_from_schema_reference(self, name, reference):
+        """Create a TOSCA node type from a JSON Schema reference"""
+
+        # Get the referenced schema
+        try:
+            ref = reference['$ref']
+        except KeyError:
+            logger.error("%s: not a schema reference", name)
+            return
+        
+        # Find the referenced schema:
+        (schema_ref, node_type_schema) = self.get_referenced_schema(ref)
+        if not node_type_schema:
+            logger.info("%s: referenced schema not found", name)
+            return
+        
+        # Create the node type for the referenced schema
+        self.create_node_type_from_schema(schema_ref, node_type_schema)
+
+
     def create_node_type_from_schema(self, schema_name, schema):
         """Create a TOSCA node type from a JSON Schema"""
         
@@ -365,6 +385,7 @@ class Swagger(object):
             self.create_data_type_from_schema(definition, value)
             if definition in self.node_types:
                 logger.info("%s is also node type", key)
+
 
 
     def create_data_type_from_schema(self, schema_name, schema):

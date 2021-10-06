@@ -254,6 +254,48 @@ node_types:
 
 data_types:
 
+  VolumeAttachmentSource:
+    description: >-
+      VolumeAttachmentSource represents a volume that should be attached.
+      Right now only PersistenVolumes can be attached via external attacher,
+      in future we may allow also inline volumes in pods. Exactly one member
+      can be set.
+    properties:
+      inlineVolumeSpec:
+        description: >-
+          inlineVolumeSpec contains all the information necessary to attach a
+          persistent volume defined by a pod's inline VolumeSource. This field
+          is populated only for the CSIMigration feature. It contains translated
+          fields from a pod's inline VolumeSource to a PersistentVolumeSpec.
+          This field is beta-level and is only honored by servers that enabled
+          the CSIMigration feature.
+        required: false
+        type: core:PersistentVolumeSpec
+      persistentVolumeName:
+        description: Name of the persistent volume to attach.
+        required: false
+        type: string
+
+  VolumeAttachmentSpec:
+    description: >-
+      VolumeAttachmentSpec is the specification of a VolumeAttachment
+      request.
+    properties:
+      attacher:
+        description: >-
+          Attacher indicates the name of the volume driver that MUST handle this
+          request. This is the name returned by GetPluginName().
+        required: true
+        type: string
+      nodeName:
+        description: The node that the volume should be attached to.
+        required: true
+        type: string
+      source:
+        description: Source represents the volume that should be attached.
+        required: true
+        type: VolumeAttachmentSource
+
   VolumeNodeResources:
     description: >-
       VolumeNodeResources is a set of resource limits for scheduling of
@@ -334,47 +376,55 @@ data_types:
         entry_schema:
           type: CSINodeDriver
 
-  VolumeAttachmentSource:
-    description: >-
-      VolumeAttachmentSource represents a volume that should be attached.
-      Right now only PersistenVolumes can be attached via external attacher,
-      in future we may allow also inline volumes in pods. Exactly one member
-      can be set.
+  VolumeError:
+    description: VolumeError captures an error encountered during a volume operation.
     properties:
-      inlineVolumeSpec:
+      message:
         description: >-
-          inlineVolumeSpec contains all the information necessary to attach a
-          persistent volume defined by a pod's inline VolumeSource. This field
-          is populated only for the CSIMigration feature. It contains translated
-          fields from a pod's inline VolumeSource to a PersistentVolumeSpec.
-          This field is beta-level and is only honored by servers that enabled
-          the CSIMigration feature.
-        required: false
-        type: core:PersistentVolumeSpec
-      persistentVolumeName:
-        description: Name of the persistent volume to attach.
+          String detailing the error encountered during Attach or Detach
+          operation. This string may be logged, so it should not contain
+          sensitive information.
         required: false
         type: string
+      time:
+        description: Time the error was encountered.
+        required: false
+        type: meta:Time
 
-  VolumeAttachmentSpec:
-    description: >-
-      VolumeAttachmentSpec is the specification of a VolumeAttachment
-      request.
+  VolumeAttachmentStatus:
+    description: VolumeAttachmentStatus is the status of a VolumeAttachment request.
     properties:
-      attacher:
+      attachError:
         description: >-
-          Attacher indicates the name of the volume driver that MUST handle this
-          request. This is the name returned by GetPluginName().
+          The last error encountered during attach operation, if any. This field
+          must only be set by the entity completing the attach operation, i.e.
+          the external-attacher.
+        required: false
+        type: VolumeError
+      attached:
+        description: >-
+          Indicates the volume is successfully attached. This field must only be
+          set by the entity completing the attach operation, i.e. the external-
+          attacher.
         required: true
-        type: string
-      nodeName:
-        description: The node that the volume should be attached to.
-        required: true
-        type: string
-      source:
-        description: Source represents the volume that should be attached.
-        required: true
-        type: VolumeAttachmentSource
+        type: boolean
+      attachmentMetadata:
+        description: >-
+          Upon successful attach, this field is populated with any information
+          returned by the attach operation that must be passed into subsequent
+          WaitForAttach or Mount calls. This field must only be set by the
+          entity completing the attach operation, i.e. the external-attacher.
+        required: false
+        type: map
+        entry_schema:
+          type: string
+      detachError:
+        description: >-
+          The last error encountered during detach operation, if any. This field
+          must only be set by the entity completing the detach operation, i.e.
+          the external-attacher.
+        required: false
+        type: VolumeError
 
   TokenRequest:
     description: TokenRequest contains parameters of a service account token.
@@ -472,54 +522,4 @@ data_types:
           type: string
         metadata:
           x-kubernetes-list-type: set
-
-  VolumeError:
-    description: VolumeError captures an error encountered during a volume operation.
-    properties:
-      message:
-        description: >-
-          String detailing the error encountered during Attach or Detach
-          operation. This string may be logged, so it should not contain
-          sensitive information.
-        required: false
-        type: string
-      time:
-        description: Time the error was encountered.
-        required: false
-        type: meta:Time
-
-  VolumeAttachmentStatus:
-    description: VolumeAttachmentStatus is the status of a VolumeAttachment request.
-    properties:
-      attachError:
-        description: >-
-          The last error encountered during attach operation, if any. This field
-          must only be set by the entity completing the attach operation, i.e.
-          the external-attacher.
-        required: false
-        type: VolumeError
-      attached:
-        description: >-
-          Indicates the volume is successfully attached. This field must only be
-          set by the entity completing the attach operation, i.e. the external-
-          attacher.
-        required: true
-        type: boolean
-      attachmentMetadata:
-        description: >-
-          Upon successful attach, this field is populated with any information
-          returned by the attach operation that must be passed into subsequent
-          WaitForAttach or Mount calls. This field must only be set by the
-          entity completing the attach operation, i.e. the external-attacher.
-        required: false
-        type: map
-        entry_schema:
-          type: string
-      detachError:
-        description: >-
-          The last error encountered during detach operation, if any. This field
-          must only be set by the entity completing the detach operation, i.e.
-          the external-attacher.
-        required: false
-        type: VolumeError
 

@@ -199,39 +199,4 @@ class Swagger2(swagger.Swagger):
         # other properties in this schema object must be ignored
         # according to the JSONSchema spec)
         schema = value['schema']
-        try:
-            ref = schema['$ref']
-        except KeyError:
-            logger.error("%s: creating node type from in-place schema not implemented",
-                         name)
-            return
-        
-        # Get the referenced schema
-        schema_ref = self.get_ref(ref)
-        try:
-            node_type_schema = self.data['definitions'][schema_ref]
-        except KeyError:
-            logger.error("%s: not found", schema_ref)
-            return
-        
-        # Create the node type for the referenced schema
-        self.create_node_type_from_schema(schema_ref, node_type_schema)
-
-
-    def get_ref(self, ref):
-        # Only support local references for now
-        try:
-            if ref[0] != '#':
-                logger.error("%s: not a local reference", ref)
-                return
-        except Exception as e:
-            logger.error("%s: not a ref (%s)", str(ref), str(e))
-            return
-        # Make sure we reference a definition
-        prefix = "#/definitions/"
-        if ref.startswith(prefix):
-            # Strip prefix
-            return ref[len(prefix):]
-        else:
-            logger.error("%s: not a ref to a definition", ref)
-            return ref
+        self.create_node_type_from_schema_reference(name, schema)
