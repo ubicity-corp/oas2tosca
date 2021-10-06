@@ -276,9 +276,9 @@ class Swagger(object):
         except KeyError:
             logger.error("%s: creating node type without group version kind", schema_name)
 
-        # Make sure we plan to define data types for any properties
-        # defined in this schema
-        self.plan_data_types_for_properties(schema)
+        # Make sure we plan deferred creation of data types for any
+        # properties defined in this schema
+        self.create_data_types_for_properties(schema, defer=True)
 
         # Create the node type in the profile for this schema
         profile = self.profiles[group]
@@ -353,7 +353,7 @@ class Swagger(object):
         profile.emit_data_type(kind, schema)
 
 
-    def create_data_types_for_properties(self, schema):
+    def create_data_types_for_properties(self, schema, defer=False):
         """Create data types for property schemas referenced in this schema
         """
         # Does this schema have property definitions?
@@ -369,7 +369,10 @@ class Swagger(object):
                 ref = property_schema['$ref']
                 schema_name = self.get_ref(ref)
                 schema = self.get_referenced_schema(ref)
-                self.create_data_type_from_schema(schema_name, schema)
+                if defer:
+                    self.definitions.add(schema_name)
+                else:
+                    self.create_data_type_from_schema(schema_name, schema)
             except KeyError:
                 # Property schema does not contain a $ref. Items
                 # perhaps?
@@ -378,14 +381,20 @@ class Swagger(object):
                     ref = items['$ref']
                     schema_name = self.get_ref(ref)
                     schema = self.get_referenced_schema(ref)
-                    self.create_data_type_from_schema(schema_name, schema)
+                    if defer:
+                        self.definitions.add(schema_name)
+                    else:
+                        self.create_data_type_from_schema(schema_name, schema)
                 except KeyError:
                     try:
                         additionalProperties = property_schema['additionalProperties']
                         ref = additionalProperties['$ref']
                         schema_name = self.get_ref(ref)
                         schema = self.get_referenced_schema(ref)
-                        self.create_data_type_from_schema(schema_name, schema)
+                        if defer:
+                            self.definitions.add(schema_name)
+                        else:
+                            self.create_data_type_from_schema(schema_name, schema)
                     except KeyError:
                         # No additional schemas
                         pass

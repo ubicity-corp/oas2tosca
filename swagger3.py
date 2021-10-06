@@ -345,43 +345,6 @@ class Swagger3(swagger.Swagger):
         self.create_node_type_from_schema(schema_name, schema)
 
             
-    def plan_data_types_for_properties(self, schema):
-        """Plan the creation of a data type for schemas referenced in this
-        schema
-        """
-        # Schemas are referenced by property definitions
-        try:
-            properties = schema['properties']
-        except KeyError:
-            # No properties
-            return
-
-        # Do any properties reference schemas?
-        for property_name, property_value in properties.items():
-            try:
-                # No type specified. Use $ref instead
-                ref = property_value['$ref']
-                schema_ref = self.get_ref(ref)
-                self.definitions.add(schema_ref)
-            except KeyError:
-                # Property schema does not contain a $ref. Items
-                # perhaps?
-                try:
-                    items = property_value['items']
-                    ref = items['$ref']
-                    schema_ref = self.get_ref(ref)
-                    self.definitions.add(schema_ref)
-                except KeyError:
-                    try:
-                        additionalProperties = property_value['additionalProperties']
-                        ref = additionalProperties['$ref']
-                        schema_ref = self.get_ref(ref)
-                        self.definitions.add(schema_ref)
-                    except KeyError:
-                        # No additional schemas
-                        pass
-
-
     def get_ref(self, ref):
         # Only support local references for now
         try:
