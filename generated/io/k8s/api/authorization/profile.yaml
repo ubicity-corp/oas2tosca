@@ -221,16 +221,6 @@ node_types:
 
 data_types:
 
-  SelfSubjectRulesReviewSpec:
-    description: >-
-      SelfSubjectRulesReviewSpec defines the specification for
-      SelfSubjectRulesReview.
-    properties:
-      namespace:
-        description: Namespace to evaluate rules for. Required.
-        required: false
-        type: string
-
   NonResourceRule:
     description: >-
       NonResourceRule holds information that describes a rule for the non-
@@ -369,6 +359,16 @@ data_types:
         required: false
         type: string
 
+  SelfSubjectRulesReviewSpec:
+    description: >-
+      SelfSubjectRulesReviewSpec defines the specification for
+      SelfSubjectRulesReview.
+    properties:
+      namespace:
+        description: Namespace to evaluate rules for. Required.
+        required: false
+        type: string
+
   NonResourceAttributes:
     description: >-
       NonResourceAttributes includes the authorization attributes available
@@ -426,6 +426,25 @@ data_types:
         required: false
         type: string
 
+  SelfSubjectAccessReviewSpec:
+    description: >-
+      SelfSubjectAccessReviewSpec is a description of the access request.
+      Exactly one of ResourceAuthorizationAttributes and
+      NonResourceAuthorizationAttributes must be set
+    properties:
+      nonResourceAttributes:
+        description: >-
+          NonResourceAttributes describes information for a non-resource access
+          request
+        required: false
+        type: NonResourceAttributes
+      resourceAttributes:
+        description: >-
+          ResourceAuthorizationAttributes describes information for a resource
+          access request
+        required: false
+        type: ResourceAttributes
+
   SubjectAccessReviewSpec:
     description: >-
       SubjectAccessReviewSpec is a description of the access request.
@@ -473,23 +492,4 @@ data_types:
           any groups
         required: false
         type: string
-
-  SelfSubjectAccessReviewSpec:
-    description: >-
-      SelfSubjectAccessReviewSpec is a description of the access request.
-      Exactly one of ResourceAuthorizationAttributes and
-      NonResourceAuthorizationAttributes must be set
-    properties:
-      nonResourceAttributes:
-        description: >-
-          NonResourceAttributes describes information for a non-resource access
-          request
-        required: false
-        type: NonResourceAttributes
-      resourceAttributes:
-        description: >-
-          ResourceAuthorizationAttributes describes information for a resource
-          access request
-        required: false
-        type: ResourceAttributes
 

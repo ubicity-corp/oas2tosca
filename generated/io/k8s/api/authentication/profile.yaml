@@ -109,6 +109,37 @@ node_types:
 
 data_types:
 
+  TokenReviewSpec:
+    description: TokenReviewSpec is a description of the token authentication request.
+    properties:
+      audiences:
+        description: >-
+          Audiences is a list of the identifiers that the resource server
+          presented with the token identifies as. Audience-aware token
+          authenticators will verify that the token was intended for at least
+          one of the audiences in this list. If no audiences are provided, the
+          audience will default to the audience of the Kubernetes apiserver.
+        required: false
+        type: list
+        entry_schema:
+          type: string
+      token:
+        description: Token is the opaque bearer token.
+        required: false
+        type: string
+
+  TokenRequestStatus:
+    description: TokenRequestStatus is the result of a token request.
+    properties:
+      expirationTimestamp:
+        description: ExpirationTimestamp is the time of expiration of the returned token.
+        required: true
+        type: meta:Time
+      token:
+        description: Token is the opaque bearer token.
+        required: true
+        type: string
+
   BoundObjectReference:
     description: >-
       BoundObjectReference is a reference to an object that a token is bound
@@ -168,37 +199,6 @@ data_types:
         type: integer
         constraints:
           - in_range: [-9223372036854775808, 9223372036854775807]
-
-  TokenRequestStatus:
-    description: TokenRequestStatus is the result of a token request.
-    properties:
-      expirationTimestamp:
-        description: ExpirationTimestamp is the time of expiration of the returned token.
-        required: true
-        type: meta:Time
-      token:
-        description: Token is the opaque bearer token.
-        required: true
-        type: string
-
-  TokenReviewSpec:
-    description: TokenReviewSpec is a description of the token authentication request.
-    properties:
-      audiences:
-        description: >-
-          Audiences is a list of the identifiers that the resource server
-          presented with the token identifies as. Audience-aware token
-          authenticators will verify that the token was intended for at least
-          one of the audiences in this list. If no audiences are provided, the
-          audience will default to the audience of the Kubernetes apiserver.
-        required: false
-        type: list
-        entry_schema:
-          type: string
-      token:
-        description: Token is the opaque bearer token.
-        required: false
-        type: string
 
   UserInfo:
     description: >-

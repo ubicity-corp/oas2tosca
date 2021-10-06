@@ -61,6 +61,47 @@ node_types:
 
 data_types:
 
+  APIServiceCondition:
+    description: >-
+      APIServiceCondition describes the state of an APIService at a
+      particular point
+    properties:
+      lastTransitionTime:
+        description: Last time the condition transitioned from one status to another.
+        required: false
+        type: meta:Time
+      message:
+        description: Human-readable message indicating details about last transition.
+        required: false
+        type: string
+      reason:
+        description: >-
+          Unique, one-word, CamelCase reason for the condition's last
+          transition.
+        required: false
+        type: string
+      status:
+        description: Status is the status of the condition. Can be True, False, Unknown.
+        required: true
+        type: string
+      type:
+        description: Type is the type of the condition.
+        required: true
+        type: string
+
+  APIServiceStatus:
+    description: APIServiceStatus contains derived information about an API server
+    properties:
+      conditions:
+        description: Current service state of apiService.
+        required: false
+        type: list
+        entry_schema:
+          type: APIServiceCondition
+        metadata:
+          x-kubernetes-list-map-keys: ['type']
+          x-kubernetes-list-type: map
+
   ServiceReference:
     description: ServiceReference holds a reference to Service.legacy.k8s.io
     properties:
@@ -155,45 +196,4 @@ data_types:
         type: integer
         constraints:
           - in_range: [-2147483648, 2147483647]
-
-  APIServiceCondition:
-    description: >-
-      APIServiceCondition describes the state of an APIService at a
-      particular point
-    properties:
-      lastTransitionTime:
-        description: Last time the condition transitioned from one status to another.
-        required: false
-        type: meta:Time
-      message:
-        description: Human-readable message indicating details about last transition.
-        required: false
-        type: string
-      reason:
-        description: >-
-          Unique, one-word, CamelCase reason for the condition's last
-          transition.
-        required: false
-        type: string
-      status:
-        description: Status is the status of the condition. Can be True, False, Unknown.
-        required: true
-        type: string
-      type:
-        description: Type is the type of the condition.
-        required: true
-        type: string
-
-  APIServiceStatus:
-    description: APIServiceStatus contains derived information about an API server
-    properties:
-      conditions:
-        description: Current service state of apiService.
-        required: false
-        type: list
-        entry_schema:
-          type: APIServiceCondition
-        metadata:
-          x-kubernetes-list-map-keys: ['type']
-          x-kubernetes-list-type: map
 

@@ -162,14 +162,6 @@ node_types:
 
 data_types:
 
-  IngressStatus:
-    description: IngressStatus describe the current state of the Ingress.
-    properties:
-      loadBalancer:
-        description: LoadBalancer contains the current status of the load-balancer.
-        required: false
-        type: core:LoadBalancerStatus
-
   IngressClassParametersReference:
     description: >-
       IngressClassParametersReference identifies an API object. This can be
@@ -628,4 +620,12 @@ data_types:
         type: list
         entry_schema:
           type: string
+
+  IngressStatus:
+    description: IngressStatus describe the current state of the Ingress.
+    properties:
+      loadBalancer:
+        description: LoadBalancer contains the current status of the load-balancer.
+        required: false
+        type: core:LoadBalancerStatus
 

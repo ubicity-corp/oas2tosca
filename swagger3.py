@@ -272,14 +272,13 @@ class Swagger3(swagger.Swagger):
         media_type_schema = media_type['schema']
         try:
             ref = media_type_schema['$ref']
-            schema_name = self.get_ref(ref)
         except KeyError:
             logger.error("%s: creating node type from in-place schema not implemented",
                          name)
             return
         
         # Find the referenced schema:
-        schema = self.get_referenced_schema(ref)
+        (schema_name, schema) = self.get_referenced_schema(ref)
         if not schema:
             logger.info("%s: referenced schema not found", name)
             return

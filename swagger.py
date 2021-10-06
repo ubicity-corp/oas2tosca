@@ -160,8 +160,7 @@ class Swagger(object):
             try:
                 # No type specified. Use $ref instead
                 ref = property_value['$ref']
-                schema_ref = self.get_ref(ref)
-                property_schema = self.get_referenced_schema(ref)
+                (schema_ref, property_schema) = self.get_referenced_schema(ref)
                 property_profile, version, property_resource, prefix = self.parse_schema_name(schema_ref, property_schema)
                 if property_profile and property_profile != profile_name:
                     profile.add_dependency(property_profile, prefix)
@@ -171,8 +170,7 @@ class Swagger(object):
                 try:
                     items = property_value['items']
                     ref = items['$ref']
-                    schema_ref = self.get_ref(ref)
-                    property_schema = self.get_referenced_schema(ref)
+                    (schema_ref, property_schema) = self.get_referenced_schema(ref)
                     property_profile, version, property_resource, prefix = self.parse_schema_name(schema_ref, property_schema)
                     if property_profile and property_profile != profile_name:
                         profile.add_dependency(property_profile, prefix)
@@ -181,8 +179,7 @@ class Swagger(object):
                     try:
                         additionalProperties = property_value['additionalProperties']
                         ref = additionalProperties['$ref']
-                        schema_ref = self.get_ref(ref)
-                        property_schema = self.get_referenced_schema(ref)
+                        (schema_ref, property_schema) = self.get_referenced_schema(ref)
                         property_profile, version, property_resource, prefix = self.parse_schema_name(schema_ref, property_schema)
                         if property_profile and property_profile != profile_name:
                             profile.add_dependency(property_profile, prefix)
@@ -433,8 +430,7 @@ class Swagger(object):
         for property_name, property_schema in properties.items():
             try:
                 ref = property_schema['$ref']
-                schema_name = self.get_ref(ref)
-                schema = self.get_referenced_schema(ref)
+                (schema_name, schema) = self.get_referenced_schema(ref)
                 if defer:
                     self.definitions.add(schema_name)
                 else:
@@ -445,8 +441,7 @@ class Swagger(object):
                 try:
                     items = property_schema['items']
                     ref = items['$ref']
-                    schema_name = self.get_ref(ref)
-                    schema = self.get_referenced_schema(ref)
+                    (schema_name, schema) = self.get_referenced_schema(ref)
                     if defer:
                         self.definitions.add(schema_name)
                     else:
@@ -455,8 +450,7 @@ class Swagger(object):
                     try:
                         additionalProperties = property_schema['additionalProperties']
                         ref = additionalProperties['$ref']
-                        schema_name = self.get_ref(ref)
-                        schema = self.get_referenced_schema(ref)
+                        (schema_name, schema) = self.get_referenced_schema(ref)
                         if defer:
                             self.definitions.add(schema_name)
                         else:
@@ -468,7 +462,9 @@ class Swagger(object):
 
 
     def get_referenced_schema(self, ref):
-        """Return the schema referenced by the 'ref' URL."""
+        """Return the schema referenced by the 'ref' URL. This method returns
+        a tuple consisting of the schema name and the schema
+        """
 
         # Split into components
         split = ref.split('/')
@@ -483,11 +479,12 @@ class Swagger(object):
         referenced = self.data
         i = 1
         while i < length:
-            referenced = referenced[split[i]]
+            name = split[i]
+            referenced = referenced[name]
             i = i+1
 
         # All done
-        return referenced
+        return (name, referenced)
 
 
     def parse_schema_name(self, schema_name, schema):
