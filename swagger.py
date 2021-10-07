@@ -121,7 +121,7 @@ class Swagger(object):
         self.profiles = dict()
 
         # Get the set of schema definitions
-        definitions = self.get_definitions()
+        definitions = self.get_schemas()
 
         # Process each schema definition
         for schema_name, schema in definitions.items():
@@ -374,7 +374,7 @@ class Swagger(object):
 
         """
         # Make sure this swagger file has definitions
-        definitions = self.get_definitions()
+        definitions = self.get_schemas()
         for definition in self.definitions:
             try:
                 value = definitions[definition]

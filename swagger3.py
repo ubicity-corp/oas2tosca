@@ -60,10 +60,10 @@ class Swagger3(swagger.Swagger):
 
     """
 
-    def get_definitions(self):
+    def get_schemas(self):
         """Get schemas for data type definitions
         """
-        # Make sure this swagger file has definitions
+        # Make sure this swagger file has defines schemas
         try:
             return self.data['components']['schemas']
         except KeyError:

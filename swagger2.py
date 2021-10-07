@@ -76,7 +76,7 @@ class Swagger2(swagger.Swagger):
         documentation.
     """
 
-    def get_definitions(self):
+    def get_schemas(self):
         try:
             return self.data['definitions']
         except KeyError:
