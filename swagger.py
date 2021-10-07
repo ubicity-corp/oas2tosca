@@ -61,7 +61,7 @@ class Swagger(object):
         self.data_types = set()
 
         # Track schemas from which to create data types
-        self.definitions = set()
+        self.deferred_schemas = set()
         
 
     def convert(self, top):
@@ -102,8 +102,8 @@ class Swagger(object):
         # Extract node types from 'path' objects
         self.process_paths()
 
-        # Create data types based on 'definitions'
-        self.process_definitions()
+        # Create data types based on 'deferred' schemas
+        self.process_deferred_schemas()
 
         # Clean up
         self.finalize_profiles()
@@ -121,10 +121,10 @@ class Swagger(object):
         self.profiles = dict()
 
         # Get the set of schema definitions
-        definitions = self.get_schemas()
+        schemas = self.get_schemas()
 
         # Process each schema definition
-        for schema_name, schema in definitions.items():
+        for schema_name, schema in schemas.items():
             self.collect_profile_info_from_schema(schema_name, schema)
 
 
@@ -368,16 +368,15 @@ class Swagger(object):
         profile.emit_node_type(kind, schema)
         
 
-    def process_definitions(self):
-        """Process the Definitions Object which holds data types produced and
-        consumed by operations.
-
+    def process_deferred_schemas(self):
+        """Process the set of Schema Objects that were marked for deferred
+        data type creation.
         """
-        # Make sure this swagger file has definitions
-        definitions = self.get_schemas()
-        for definition in self.definitions:
+        # Make sure this swagger file has schemas
+        schemas = self.get_schemas()
+        for definition in self.deferred_schemas:
             try:
-                value = definitions[definition]
+                value = schemas[definition]
             except KeyError:
                 logger.error("Definition %s not found", definition)
                 continue
@@ -453,7 +452,7 @@ class Swagger(object):
                 ref = property_schema['$ref']
                 (schema_name, schema) = self.get_referenced_schema(ref)
                 if defer:
-                    self.definitions.add(schema_name)
+                    self.deferred_schemas.add(schema_name)
                 else:
                     self.create_data_type_from_schema(schema_name, schema)
             except KeyError:
@@ -464,7 +463,7 @@ class Swagger(object):
                     ref = items['$ref']
                     (schema_name, schema) = self.get_referenced_schema(ref)
                     if defer:
-                        self.definitions.add(schema_name)
+                        self.deferred_schemas.add(schema_name)
                     else:
                         self.create_data_type_from_schema(schema_name, schema)
                 except KeyError:
@@ -473,7 +472,7 @@ class Swagger(object):
                         ref = additionalProperties['$ref']
                         (schema_name, schema) = self.get_referenced_schema(ref)
                         if defer:
-                            self.definitions.add(schema_name)
+                            self.deferred_schemas.add(schema_name)
                         else:
                             self.create_data_type_from_schema(schema_name, schema)
                     except KeyError:
