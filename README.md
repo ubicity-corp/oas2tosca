@@ -1,2 +1,1 @@
-# swagger2tosca
-Convert Swagger definitions to TOSCA data types
+# Convert OpenAPI Specifications to TOSCA Profiles
