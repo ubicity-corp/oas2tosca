@@ -10,7 +10,7 @@ TOP_DIR=$(readlink --canonicalize "$HERE/..")
 WHEELS_DIR="${TOP_DIR}"/wheels
 
 # Build
-pip wheel ${TOP_DIR} --wheel-dir ${WHEELS_DIR} --only-binary :all:
+pip wheel ${TOP_DIR} --wheel-dir ${WHEELS_DIR}
 
 
 
