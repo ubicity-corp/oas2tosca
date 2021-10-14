@@ -12,12 +12,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Profiles
-import profile as p
+import oas2tosca.profile as p
 
 # System support
-import swagger
+import oas2tosca.swagger
 
-class Swagger3(swagger.Swagger):
+class Swagger3(oas2tosca.swagger.Swagger):
     """An OpenAPI v3 file has the following properties:
 
       openapi(string): REQUIRED. This string MUST be the semantic

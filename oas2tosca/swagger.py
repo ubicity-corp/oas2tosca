@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 import sys
 
 # Profiles
-import profile as p
+import oas2tosca.profile as p
 
 
 def get_version(data):

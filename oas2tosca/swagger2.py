@@ -12,13 +12,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 # System support
-import swagger
+import oas2tosca.swagger
 
 # Text formatting
 import textwrap
 
 
-class Swagger2(swagger.Swagger):
+class Swagger2(oas2tosca.swagger.Swagger):
     """A Swagger 2 object has the following properties:
 
       swagger(string): Required. Specifies the Swagger Specification

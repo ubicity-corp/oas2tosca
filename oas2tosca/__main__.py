@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 import argparse
 
 # Support for swagger files
-from read import read_swagger
-import swagger as sw
-import swagger2
-import swagger3
+import oas2tosca.read_oas as ro
+import oas2tosca.swagger as sw
+import oas2tosca.swagger2 as sw2
+import oas2tosca.swagger3 as sw3
 
 
 def main():
@@ -52,7 +52,7 @@ def main():
 
     # Read swagger input
     try:
-        swagger_data = read_swagger(args.input)
+        swagger_data = ro.read_swagger(args.input)
     except Exception as e:
         logger.error("Error reading '%s': %s", args.input, str(e))
         exit(1)
@@ -62,10 +62,10 @@ def main():
         swagger_version = sw.get_version(swagger_data)
         if swagger_version[0] == '2':
             logger.info("Converting Swagger 2.0 file")
-            swagger = swagger2.Swagger2(swagger_data)
+            swagger = sw2.Swagger2(swagger_data)
         elif swagger_version[0] == '3':
             logger.info("Converting Swagger 3.0 file")
-            swagger = swagger3.Swagger3(swagger_data)
+            swagger = sw3.Swagger3(swagger_data)
         else:
             logger.error("Unsupported Swagger version %s", swagger_version)
             exit(2)
@@ -74,6 +74,7 @@ def main():
         exit(3)
 
     # Convert
+    swagger.convert(args.output)
     try:
         swagger.convert(args.output)
     except Exception as e:
