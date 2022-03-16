@@ -2,10 +2,8 @@
 # or more TOSCA profiles
 #
 __author__ = "Chris Lauwers"
-__copyright__ = "Copyright (c) 2020-2021, Ubicity Corp."
-__version__ = "0.0.1"
+__copyright__ = "Copyright (c) 2020-2022, Ubicity Corp."
 __email__ = "lauwers@ubicity.com"
-__status__ = "Prototype"
 
 # Logging support
 import logging
@@ -13,6 +11,9 @@ logger = logging.getLogger(__name__)
 
 # Parse command line arguments
 import argparse
+
+# Version string
+from . import __version__
 
 # Support for swagger files
 import oas2tosca.read_oas as ro
@@ -31,6 +32,7 @@ def main():
 
     parser.add_argument('-i', '--input', action='store', help='swagger input file')
     parser.add_argument('-o', '--output', action='store', help='tosca output directory')
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s ' + str(__version__))
 
     # Parse command line
     args = parser.parse_args()
