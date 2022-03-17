@@ -16,7 +16,12 @@ import oas2tosca.profile as p
 import oas2tosca.swagger
 
 class Swagger3(oas2tosca.swagger.Swagger):
-    """An OpenAPI v3 file has the following properties:
+    """The class supports parsing and processing of OpenAPI v3
+    documents. OpenAPI v3 is documented here:
+
+    https://swagger.io/specification/
+
+    An OpenAPI v3 file has the following properties:
 
       openapi(string): REQUIRED. This string MUST be the semantic
         version number of the OpenAPI Specification version that the
@@ -59,9 +64,42 @@ class Swagger3(oas2tosca.swagger.Swagger):
     """
 
     def get_schemas(self):
-        """Get schemas for data type definitions
+        """Get schemas for data type definitions from the 'components' section
+        of the swagger file.
+
+        The components section includes the following:
+
+          schemas (Map[string, Schema Object | Reference Object]): An
+            object to hold reusable Schema Objects.
+
+          responses (Map[string, Response Object | Reference Object]):
+            An object to hold reusable Response Objects.
+
+          parameters (Map[string, Parameter Object | Reference
+            Object]): An object to hold reusable Parameter Objects.
+
+          examples (Map[string, Example Object | Reference Object]):
+            An object to hold reusable Example Objects.
+
+          requestBodies (Map[string, Request Body Object | Reference
+            Object]): An object to hold reusable Request Body Objects.
+
+          headers (Map[string, Header Object | Reference Object]): An
+            object to hold reusable Header Objects.
+
+          securitySchemes (Map[string, Security Scheme Object |
+            Reference Object]): An object to hold reusable Security
+            Scheme Objects.
+
+          links (Map[string, Link Object | Reference Object]): An
+            object to hold reusable Link Objects.
+
+          callbacks (Map[string, Callback Object | Reference Object]):
+            An object to hold reusable Callback Objects.
+
         """
         # Make sure this swagger file has defines schemas
+
         try:
             return self.data['components']['schemas']
         except KeyError:

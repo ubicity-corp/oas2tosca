@@ -17,7 +17,12 @@ import textwrap
 
 
 class Swagger2(oas2tosca.swagger.Swagger):
-    """A Swagger 2 object has the following properties:
+    """The class supports parsing and processing of OpenAPI v2
+    documents. OpenAPI v2 is documented here:
+
+    https://swagger.io/specification/v2/
+
+    A Swagger 2 object has the following properties:
 
       swagger(string): Required. Specifies the Swagger Specification
         version being used. It can be used by the Swagger UI and other

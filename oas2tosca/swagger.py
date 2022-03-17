@@ -323,7 +323,28 @@ class Swagger(object):
 
 
     def create_node_type_from_schema(self, schema_name, schema):
-        """Create a TOSCA node type from a JSON Schema"""
+        """Create a TOSCA node type from a JSON Schema. TODO: this should be
+        moved into its own module.
+
+        The basic JSON schema documentation can be found at:
+
+        https://json-schema.org/
+
+        The important documents are:
+
+        JSON Schema Core: This document asserts what a JSON document
+        must look like
+          https://datatracker.ietf.org/doc/html/draft-wright-json-schema-01
+
+        JSON Schema Validation. This document specifies a vocabulary
+        for JSON Schema to describe the meaning of JSON documents:
+          https://datatracker.ietf.org/doc/html/draft-wright-json-schema-validation-01
+
+        Note that OpenAPI schema objects extend the standard JSON
+        Schema objects. These extensions are documented in:
+          https://swagger.io/specification/
+
+        """
         
         # Avoid duplicates
         if schema_name in self.node_types:
@@ -382,7 +403,6 @@ class Swagger(object):
             self.create_data_type_from_schema(definition, value)
             if definition in self.node_types:
                 logger.info("%s is also node type", key)
-
 
 
     def create_data_type_from_schema(self, schema_name, schema):
