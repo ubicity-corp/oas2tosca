@@ -212,6 +212,8 @@ class Profile(object):
         will be handled separately for each type.
         """
 
+        logger.debug("Emit node type %s", kind)
+
         # Do we have to write the header first?
         if not self.already_has_node_types:
             self.out.write("node_types:\n\n")
@@ -274,7 +276,7 @@ class Profile(object):
         will be handled separately for each type.
         """
 
-        logger.info("Emit data type %s", kind)
+        logger.debug("Emit data type %s", kind)
         
         # Do we have to write the header first?
         if not self.already_has_data_types:
@@ -671,7 +673,7 @@ class Profile(object):
 
     def process_keywords_for_any(self, indent, name, schema):
         """Create a TOSCA data type from a JSON Schema any type"""
-        logger.info("%s: any not implemented", name)
+        logger.info("%s: 'any' not implemented", name)
 
 
     def process_keywords_for_object(self, indent, name, schema):

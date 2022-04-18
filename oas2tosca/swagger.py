@@ -315,7 +315,7 @@ class Swagger(object):
         # Find the referenced schema:
         (schema_ref, node_type_schema) = self.get_referenced_schema(ref)
         if not node_type_schema:
-            logger.info("%s: referenced schema not found", name)
+            logger.error("%s: referenced schema not found", name)
             return
         
         # Create the node type for the referenced schema
@@ -348,7 +348,7 @@ class Swagger(object):
         
         # Avoid duplicates
         if schema_name in self.node_types:
-            logger.info("%s: duplicate", schema_name)
+            logger.debug("%s: duplicate", schema_name)
             return
         self.node_types.add(schema_name)
         
@@ -425,7 +425,6 @@ class Swagger(object):
 
         # Parse group, version, and kind from the schema name. 
         group, version, kind, prefix = self.parse_schema_name(schema_name, schema)
-        logger.info("In profile %s", group)
         
         # We only handle v1 for now
         if version and version != "v1":
@@ -438,7 +437,7 @@ class Swagger(object):
         # sure why.
         try:
             group_version_kind_list = schema['x-kubernetes-group-version-kind']
-            logger.error("%s: creating data type with group version kind", schema_name)
+            logger.warn("%s: creating data type with 'group-version-kind'", schema_name)
         except KeyError:
             pass
         

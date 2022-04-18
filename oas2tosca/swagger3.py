@@ -240,7 +240,7 @@ class Swagger3(oas2tosca.swagger.Swagger):
         try:
             body = value['requestBody']
         except KeyError:
-            logger.info("%s: no request body", name)
+            logger.error("%s: no request body", name)
             return
 
         self.process_request_body(name, body)
@@ -263,7 +263,6 @@ class Swagger3(oas2tosca.swagger.Swagger):
           in the request. Defaults to false.
 
         """
-        logger.info("Processing %s", name)
         content = body['content']
 
         try:

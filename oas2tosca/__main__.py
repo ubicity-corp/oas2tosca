@@ -63,10 +63,10 @@ def main():
     try:
         swagger_version = sw.get_version(swagger_data)
         if swagger_version[0] == '2':
-            logger.info("Converting Swagger 2.0 file")
+            logger.debug("Converting Swagger 2.0 file")
             swagger = sw2.Swagger2(swagger_data)
         elif swagger_version[0] == '3':
-            logger.info("Converting Swagger 3.0 file")
+            logger.debug("Converting Swagger 3.0 file")
             swagger = sw3.Swagger3(swagger_data)
         else:
             logger.error("Unsupported Swagger version %s", swagger_version)
@@ -76,7 +76,6 @@ def main():
         exit(3)
 
     # Convert
-    swagger.convert(args.output)
     try:
         swagger.convert(args.output)
     except Exception as e:
