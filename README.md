@@ -30,12 +30,12 @@ your virtual environment:
 The software can be installed directly from the git repository by
 running the following command in your virtual environment:
 
-    pip install git+https://github.com/lauwers/oas2tosca
+    pip install git+https://github.com/ubicity-corp/oas2tosca
     
 Alternatively, you can also clone the git repo first and then run the
 installer in your local copy as follows:
 
-    git clone https://github.com/lauwers/oas2tosca
+    git clone https://github.com/ubicity-corp/oas2tosca
     cd oas2tosca
     pip install . 
     
