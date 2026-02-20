@@ -190,6 +190,9 @@ class Swagger2(oas2tosca.swagger.Swagger):
         schema(Schema Object): Required if 'in' is 'body'. The schema
           defining the type used for the body parameter.
         """
+        # Don't process this if this is a reference
+        if value.get('$ref'): return
+        
         # We create a node type for any resource that has a POST
         # operation with a 'body' parameter
         if not value['in'] == 'body':
