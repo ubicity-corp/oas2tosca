@@ -641,8 +641,8 @@ class Profile(object):
             if enum: self.emit_valid_values(indent, enum)
             if maximum: self.emit_maximum(indent, maximum)
             if minimum: self.emit_minimum(indent, minimum)
-            if exclusive_maximum: self.emit_exclusive_maximum(indent, exclusiveMaximum)
-            if exclusive_minimum: self.emit_exclusive_minimum(indent, exclusiveMinimum)
+            if exclusive_maximum: self.emit_exclusive_maximum(indent, exclusive_maximum)
+            if exclusive_minimum: self.emit_exclusive_minimum(indent, exclusive_minimum)
 
 
     def process_keywords_for_boolean(self, indent, name, schema):
@@ -822,20 +822,22 @@ class Profile(object):
 
 
     def add_properties(self, indent, properties, required):
-        """Write out the property definitions for this type"""
-        
-        self.out.write(
-            "%sproperties:\n"
-            % indent
-        )
-        indent = indent + '  '
-        for property_name, property_schema in properties.items():
-            try:
-                readOnly = property_schema['readOnly']
-                logger.info("%s: is really an attribute", property_name)
-            except KeyError:
-                pass
-            self.add_property(indent, property_name, property_schema, required)
+        """Write out the property and attribute definitions for this type"""
+
+        regular = {n: s for n, s in properties.items() if not s.get('readOnly')}
+        read_only = {n: s for n, s in properties.items() if s.get('readOnly')}
+
+        if regular:
+            self.out.write("%sproperties:\n" % indent)
+            prop_indent = indent + '  '
+            for property_name, property_schema in regular.items():
+                self.add_property(prop_indent, property_name, property_schema, required)
+
+        if read_only:
+            self.out.write("%sattributes:\n" % indent)
+            attr_indent = indent + '  '
+            for property_name, property_schema in read_only.items():
+                self.add_attribute(attr_indent, property_name, property_schema)
             
 
     def add_property(self, indent, property_name, schema, required):
@@ -924,6 +926,28 @@ class Profile(object):
         self.process_keywords_for_type(indent, property_name, schema)
 
 
+    def add_attribute(self, indent, property_name, schema):
+        """Add an attribute definition for a readOnly JSON schema property"""
+
+        self.out.write("%s%s:\n" % (indent, property_name))
+        indent = indent + '  '
+        try:
+            description = schema['description']
+            self.emit_description(indent, description)
+        except KeyError:
+            pass
+
+        # Write default value
+        try:
+            default = schema['default']
+            self.out.write("%sdefault: %s\n" % (indent, default))
+        except KeyError:
+            pass
+
+        # Remaining definitions depend on the attribute type
+        self.process_keywords_for_type(indent, property_name, schema)
+
+
     def add_entry_schema(self, indent, name, schema):
         """Add entry schema for a list or map"""
         self.out.write("%sentry_schema:\n" % indent)
@@ -994,7 +1018,7 @@ class Profile(object):
                         type_name = prefix + ':' + kind
                     else:
                         type_name = kind
-                        self.out.write("%stype: %s\n" % (indent, type_name))
+                    self.out.write("%stype: %s\n" % (indent, type_name))
                 except KeyError:
                     #  This property can be of any type. Given the
                     # lack of 'any' in TOSCA, we'll just use 'string'
@@ -1015,12 +1039,12 @@ class Profile(object):
             return 'string'
         elif fmt == 'date':
             return 'timestamp'
-        elif fmt == 'dateTime':
+        elif fmt == 'date-time' or fmt == 'dateTime':
             return 'timestamp'
         elif fmt == 'password':
             return 'string'
         else:
-            logger.error("Unsupported string format '%s'", format)
+            logger.error("Unsupported string format '%s'", fmt)
             return 'string'
 
 
@@ -1108,7 +1132,7 @@ class Profile(object):
     def emit_max_length(self, indent, maxLength):
         self.out.write("%s- max_length: %s\n" % (indent, maxLength))
 
-    def emit_min_length(indent, minLength):
+    def emit_min_length(self, indent, minLength):
         self.out.write("%s- min_length: %s\n" % (indent, minLength))
 
     def emit_pattern(self, indent, pattern):
