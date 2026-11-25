@@ -1,6 +1,19 @@
 Convert OpenAPI Specifications to TOSCA Profiles
 ===
 
+> **This repository is archived. `oas2tosca` is now part of
+> [any2tosca](https://github.com/ubicity-corp/any2tosca)**, which converts
+> OpenAPI 2.0 and 3.x (and JSON Schema, Redfish and YANG) to TOSCA 2.0:
+>
+> ```bash
+> pip install any2tosca
+> oas2tosca openapi.yaml -o tosca/
+> oas2tosca --kubernetes swagger.json --profile io.kubernetes:1.37 -o io/kubernetes/1.37/
+> ```
+>
+> The rest of this README describes the archived tool, which generates TOSCA
+> Simple Profile in YAML v1.3.
+
 ``oas2tosca`` converts OpenAPI Specification files to one or more
 TOSCA Profiles. It supports OpenAPI v2 as well as OpenAPI v3, and
 generates TOSCA Simple Profile in YAML v1.3 profiles.
